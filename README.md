@@ -1,107 +1,88 @@
-🎬 YTDLL – Video & Audio Downloader
-
+# 🎬 YTDLL – Video & Audio Downloader
 Un poderoso GUI para yt-dlp hecho en PowerShell
 
-<p align="center"> <img src="https://img.shields.io/badge/PowerShell-5.1+-blue.svg"> <img src="https://img.shields.io/badge/Platform-Windows-lightgrey.svg"> <img src="https://img.shields.io/badge/Version-beta%20251121.1825-green.svg"> </p>
-📖 Índice / Table of Contents
+<p align="center">
+  <img src="https://img.shields.io/badge/PowerShell-5.1+-blue.svg">
+  <img src="https://img.shields.io/badge/Platform-Windows-lightgrey.svg">
+  <img src="https://img.shields.io/badge/Version-beta%20251121.1825-green.svg">
+</p>
 
-🌎 Descripción General
+---
 
-✨ Características / Features
+# 📖 Índice / Table of Contents
+- [🌎 Descripción General](#-descripción-general--overview)
+- [✨ Características](#-características--features)
+  - [🔥 Principales](#-principales)
+  - [🧠 Avanzadas](#-funciones-avanzadas)
+- [⚙️ Requisitos](#️-requisitos-del-sistema--system-requirements)
+- [🚀 Instalación](#-instalación--installation)
+- [🎮 Uso](#-uso--usage)
+- [📁 Estructura del Proyecto](#-estructura-del-proyecto--project-structure)
+- [🖼️ Capturas de Pantalla](#️-capturas-de-pantalla--screenshots)
+- [🌐 Sitios Compatibles](#-sitios-compatibles--supported-sites)
+- [🔧 Solución de Problemas](#-solución-de-problemas--troubleshooting)
+- [🤝 Contribuciones](#-contribuciones--contributions)
+- [📄 Licencia](#-licencia--license)
 
-⚙️ Requisitos del Sistema
+---
 
-🚀 Instalación
+## 🌎 Descripción General / Overview
+**ES:**  
+YTDLL es una aplicación gráfica moderna desarrollada en PowerShell. Combina simplicidad con potencia ofreciendo una GUI limpia e intuitiva para yt-dlp, permitiendo descargar videos y audio desde más de 1000 sitios compatibles.
 
-🎮 Uso
+**EN:**  
+YTDLL is a modern GUI built in PowerShell. It provides a clean and intuitive interface for yt-dlp, enabling seamless video/audio downloads from 1000+ supported sites.
 
-📁 Estructura del Proyecto
+---
 
-🖼️ Capturas de Pantalla
+## ✨ Características / Features
 
-🌐 Sitios Compatibles
+### 🔥 Principales
+- 🖼️ Vista previa en tiempo real  
+- 🎯 Selección inteligente de formato (video/audio)  
+- 📁 Explorador gráfico para carpeta destino  
+- 🔄 Auto-instalación/actualización de dependencias (Chocolatey)  
+- 📊 Progreso en tiempo real con parser avanzado  
+- 🍪 Soporte de cookies  
+- 📜 Historial persistente de URLs  
+- 🎮 Reproducción rápida con mpv.net  
+- ⚡ GUI moderna (borderless, esquinas redondeadas)
 
-🔧 Solución de Problemas
+### 🧠 Funciones Avanzadas
+- Detección automática de dependencias  
+- Clasificación inteligente de formatos (audio-only, video-only, progressive)  
+- Miniaturas desde múltiples fuentes  
+- Cache local de imágenes/metadatos  
+- Fallbacks inteligentes  
+- Modo debug + logs detallados  
+- Reintentos automáticos  
+- Limpieza de temporales  
 
-🤝 Contribuciones
+---
 
-📄 Licencia
+## ⚙️ Requisitos del Sistema / System Requirements
+- Windows 10 o superior  
+- PowerShell 5.1+ o PowerShell 7+  
+- Internet  
+- 4GB RAM recomendado  
 
-🌎 Descripción General / Overview
+**Dependencias manejadas automáticamente:**
 
-ES: YTDLL es una aplicación gráfica moderna desarrollada en PowerShell. Combina simplicidad con potencia ofreciendo una GUI limpia e intuitiva para yt-dlp, permitiendo descargar videos y audio desde más de 1000 sitios compatibles.
+- yt-dlp  
+- FFmpeg  
+- Node.js (LTS)  
+- mpv.net (opcional)  
+- Chocolatey  
 
-EN: YTDLL is a modern graphical application built in PowerShell. It provides a clean, intuitive user interface for yt-dlp, enabling seamless video and audio downloads from 1000+ supported websites.
+---
 
-✨ Características / Features
-🔥 Principales
+## 🚀 Instalación / Installation
 
-🖼️ Vista previa en tiempo real
+### ⭐ Método Rápido (Recomendado)
+Ejecuta en PowerShell (Admin):
 
-🎯 Selección inteligente de formato (video/audio)
+powershell
 
-📁 Gestor de destino con explorador gráfico
-
-🔄 Auto-instalación/actualización de dependencias (Chocolatey)
-
-📊 Progreso en tiempo real (parsing avanzado de yt-dlp)
-
-🍪 Soporte de cookies para contenido restringido
-
-📜 Historial persistente de URLs
-
-🎮 Reproducción rápida con mpv.net
-
-⚡ GUI moderna (borderless, esquinas redondeadas, tooltips, hover-effects)
-
-🧠 Funciones Avanzadas
-
-Detección automática de dependencias: yt-dlp, ffmpeg, mpv.net, Node.js
-
-Clasificación inteligente de formatos: audio-only, video-only, progressive
-
-Miniaturas obtenidas desde múltiples fuentes
-
-Cache local de imágenes y metadatos
-
-Sistemas de fallback cuando un método falla
-
-Modo debug y logs detallados
-
-Reintentos automáticos de descarga
-
-Limpieza automática de archivos temporales
-
-⚙️ Requisitos del Sistema / System Requirements
-Requisitos mínimos
-
-Windows 10 o superior
-
-PowerShell 5.1+ o PowerShell 7+
-
-Conexión a Internet
-
-4GB RAM (recomendado)
-
-Dependencias gestionadas automáticamente
-
-yt-dlp
-
-FFmpeg
-
-Node.js (LTS)
-
-mpv.net (opcional pero recomendado)
-
-Chocolatey
-
-🚀 Instalación / Installation
-⭐ Método Rápido (Recomendado)
-
-Ejecuta en PowerShell como administrador:
-
-Set-ExecutionPolicy Bypass -Scope Process -Force
-irm bit.ly/ytdll | iex
 
 📦 Instalación Manual
 git clone https://github.com/water0ff/PWytdll.git
@@ -115,23 +96,23 @@ Pega la URL del video
 
 Presiona Buscar Video
 
-Selecciona el formato de video y audio
+Selecciona formato de video/audio
 
 Elige carpeta destino
 
-Haz clic en Descargar
+Clic en Descargar
 
-Características Avanzadas
+Funciones Avanzadas
 
 ❓ Botón “Info”: estado de dependencias
 
-🖼️ Click en miniatura → abre vista previa en mpv
+🖼️ Click en miniatura → abre mpv
 
 🎛️ Selector inteligente de formatos
 
 📜 Historial desplegable
 
-🍪 Carga de cookies para contenido bloqueado
+🍪 Soporte para cookies
 
 📁 Estructura del Proyecto / Project Structure
 PWytdll/
@@ -141,30 +122,23 @@ PWytdll/
     ├── screenshots/          # Screenshots
     └── icons/                # Icons used by the app
 
-
 Archivos de configuración
-
 C:\Temp\ytdll\config.ini
-
 C:\Temp\ytdll\ytdll_history.txt
-
 C:\Temp\ytdll\miniaturas\
 
 🖼️ Capturas de Pantalla / Screenshots
+🪟 Interfaz Principal
 
-⬇️ Añade tus capturas aquí (secciones sugeridas)
-
-🪟 Interfaz Principal / Main UI
-
-(coloca la imagen aquí)
+(agrega la imagen aquí)
 
 🎚️ Selector de Formatos
 
-(coloca la imagen aquí)
+(agrega la imagen aquí)
 
 🧩 Información del Sistema
 
-(coloca la imagen aquí)
+(agrega la imagen aquí)
 
 🌐 Sitios Compatibles / Supported Sites
 Plataformas Principales
@@ -183,14 +157,13 @@ Facebook
 
 Reddit
 
-Vimeo, Dailymotion
+Vimeo
 
-+1000 sitios más vía yt-dlp
+Dailymotion
 
-Dentro de la aplicación puedes ver la lista completa actualizada.
+➡️ Más de 1000 sitios vía yt-dlp.
 
 🔧 Solución de Problemas / Troubleshooting
-Problemas Comunes
 ❌ “yt-dlp no encontrado”
 
 Solución automática incluida.
@@ -208,21 +181,21 @@ Revisa instalación de mpv.net.
 
 ❌ Descargas lentas
 
-Verifica tu red
+Revisa tu red
 
-Elige otro formato
+Cambia formato
 
 Usa cookies para contenido privado
 
 🤝 Contribuciones / Contributions
 
-Las contribuciones son bienvenidas.
+Contribuciones bienvenidas.
 
-Pasos
+Pasos:
 
 Fork
 
-Nueva rama feature/nombre
+Rama: feature/nombre
 
 Commit
 
@@ -232,7 +205,7 @@ Reportar Problemas
 
 Incluye:
 
-Descripción del error
+Descripción
 
 Pasos para reproducir
 
@@ -246,10 +219,10 @@ Este proyecto está bajo licencia MIT.
 Consulta el archivo LICENSE.
 
 <div align="center">
-⭐ ¿Te gusta este proyecto?
 
-¡Considera dejar una estrella en GitHub!
-
+⭐ ¿Te gusta este proyecto? Considera dejar una estrella en GitHub.
 ⬆ Volver al inicio
 
-</div>
+</div> ```
+Set-ExecutionPolicy Bypass -Scope Process -Force
+irm bit.ly/ytdll | iex
