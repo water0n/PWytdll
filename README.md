@@ -130,7 +130,7 @@ C:\Temp\ytdll\miniaturas\
 
 🧩 Información del Sistema
 
-(agrega la imagen aquí)
+![Información del Sistema](Screenshots/appinfo.png)
 
 ## 🌐 Sitios Compatibles / Supported Sites
 Plataformas Principales
