@@ -122,7 +122,7 @@ C:\Temp\ytdll\miniaturas\
 ## 🖼️ Capturas de Pantalla / Screenshots
 🪟 Interfaz Principal
 
-Screenshots/principal.png
+![Interfaz Principal](Screenshots/principal.png)
 
 🎚️ Selector de Formatos
 
