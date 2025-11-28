@@ -20,8 +20,6 @@ Un poderoso GUI para yt-dlp hecho en PowerShell
 - [📁 Estructura del Proyecto](#-estructura-del-proyecto--project-structure)
 - [🖼️ Capturas de Pantalla](#️-capturas-de-pantalla--screenshots)
 - [🌐 Sitios Compatibles](#-sitios-compatibles--supported-sites)
-- [🔧 Solución de Problemas](#-solución-de-problemas--troubleshooting)
-- [🤝 Contribuciones](#-contribuciones--contributions)
 - [📄 Licencia](#-licencia--license)
 
 ---
@@ -81,13 +79,7 @@ YTDLL is a modern GUI built in PowerShell. It provides a clean and intuitive int
 ### ⭐ Método Rápido (Recomendado)
 Ejecuta en PowerShell (Admin):
 
-powershell
-
-
-📦 Instalación Manual
-git clone https://github.com/water0ff/PWytdll.git
-cd PWytdll
-.\ytdll.ps1
+irm bit.ly/ytdll | iex
 
 🎮 Uso / Usage
 Interfaz Gráfica
@@ -114,7 +106,7 @@ Funciones Avanzadas
 
 🍪 Soporte para cookies
 
-📁 Estructura del Proyecto / Project Structure
+## 📁 Estructura del Proyecto / Project Structure
 PWytdll/
 ├── ytdll.ps1                 # Main script
 ├── README.md                 # Documentation
@@ -127,7 +119,7 @@ C:\Temp\ytdll\config.ini
 C:\Temp\ytdll\ytdll_history.txt
 C:\Temp\ytdll\miniaturas\
 
-🖼️ Capturas de Pantalla / Screenshots
+## 🖼️ Capturas de Pantalla / Screenshots
 🪟 Interfaz Principal
 
 (agrega la imagen aquí)
@@ -140,80 +132,22 @@ C:\Temp\ytdll\miniaturas\
 
 (agrega la imagen aquí)
 
-🌐 Sitios Compatibles / Supported Sites
+## 🌐 Sitios Compatibles / Supported Sites
 Plataformas Principales
 
 YouTube (videos, shorts, playlists)
-
 Twitch (VODs, clips)
-
 Twitter / X
-
 TikTok
-
 Instagram
-
 Facebook
-
 Reddit
-
 Vimeo
-
 Dailymotion
 
 ➡️ Más de 1000 sitios vía yt-dlp.
 
-🔧 Solución de Problemas / Troubleshooting
-❌ “yt-dlp no encontrado”
-
-Solución automática incluida.
-Manual:
-
-choco install yt-dlp -y
-
-❌ Errores de permisos
-
-Ejecuta PowerShell como administrador.
-
-❌ Vista previa no carga
-
-Revisa instalación de mpv.net.
-
-❌ Descargas lentas
-
-Revisa tu red
-
-Cambia formato
-
-Usa cookies para contenido privado
-
-🤝 Contribuciones / Contributions
-
-Contribuciones bienvenidas.
-
-Pasos:
-
-Fork
-
-Rama: feature/nombre
-
-Commit
-
-Pull Request
-
-Reportar Problemas
-
-Incluye:
-
-Descripción
-
-Pasos para reproducir
-
-Capturas
-
-Versión del sistema y script
-
-📄 Licencia / License
+## 📄 Licencia / License
 
 Este proyecto está bajo licencia MIT.
 Consulta el archivo LICENSE.
