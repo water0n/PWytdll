@@ -126,7 +126,7 @@ C:\Temp\ytdll\miniaturas\
 
 🎚️ Selector de Formatos
 
-(agrega la imagen aquí)
+![Selector de Formatos](Screenshots/formatos.png)
 
 🧩 Información del Sistema
 
