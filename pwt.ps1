@@ -14,7 +14,7 @@ $script:ConfigFile = "C:\Temp\ytdll\config.ini"
 if (-not (Test-Path -LiteralPath $script:LogFile)) {
     New-Item -ItemType File -Path $script:LogFile -Force | Out-Null
 }
-                                                                                                $version = "beta 251121.1825"
+                                                                                                $version = "beta 251215.1225"
 function Get-IniValue {
     param([string]$Section, [string]$Key, [string]$DefaultValue = $null)
     
