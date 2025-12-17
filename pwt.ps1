@@ -2051,6 +2051,61 @@ function Show-AppInfo {
         Refresh-DependencyLabel -CommandName "node" -FriendlyName "Node.js" -LabelRef ([ref]$lblNode) -VersionArgs "--version" -Parse "FirstLine"
     }
     Refresh-DependencyLabel -CommandName "mpvnet" -FriendlyName "mpv.net" -LabelRef ([ref]$lblMpvNet) -VersionArgs "--version" -Parse "FirstLine"
+    $btnYtRefresh.Add_Click({
+        Update-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -CommandName "yt-dlp" -LabelRef ([ref]$lblYtDlp) -VersionArgs "--version" -Parse "FirstLine"
+    })
+    $btnYtUninstall.Add_Click({
+        Uninstall-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -LabelRef ([ref]$lblYtDlp)
+    })
+    $btnFfmpegRefresh.Add_Click({
+        Update-Dependency -ChocoPkg "ffmpeg" -FriendlyName "ffmpeg" -CommandName "ffmpeg" -LabelRef ([ref]$lblFfmpeg) -VersionArgs "-version" -Parse "FirstLine"
+    })
+    $btnFfmpegUninstall.Add_Click({
+        Uninstall-Dependency -ChocoPkg "ffmpeg" -FriendlyName "ffmpeg" -LabelRef ([ref]$lblFfmpeg)
+    })
+    $btnNodeRefresh.Add_Click({
+        Update-Dependency -ChocoPkg "nodejs-lts" -FriendlyName "Node.js" -CommandName "node" -LabelRef ([ref]$lblNode) -VersionArgs "--version" -Parse "FirstLine"
+    })
+    $btnNodeUninstall.Add_Click({
+        Uninstall-Dependency -ChocoPkg "nodejs-lts" -FriendlyName "Node.js" -LabelRef ([ref]$lblNode)
+    })
+    $btnMpvNetRefresh.Add_Click({
+         if (-not (Ensure-DotNet6DesktopRuntime)) {
+            return
+        }
+        Update-Dependency -ChocoPkg "mpv.net" -FriendlyName "mpv.net" -CommandName "mpvnet" -LabelRef ([ref]$lblMpvNet) -VersionArgs "--version" -Parse "FirstLine"
+    })
+    $btnMpvNetUninstall.Add_Click({
+        if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Chocolatey no está disponible. No se puede desinstalar mpv.net, mpvnet.portable ni .NET 6 Desktop Runtime.",
+                "Chocolatey requerido",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            ) | Out-Null
+            return
+        }
+
+        $msg = "Se desinstalarán los siguientes componentes:" +
+               [Environment]::NewLine +
+               " • mpv.net" + [Environment]::NewLine +
+               " • mpvnet.portable" + [Environment]::NewLine +
+               " • Microsoft .NET 6 Desktop Runtime" + [Environment]::NewLine + [Environment]::NewLine +
+               "¿Deseas continuar?"
+
+        $r = [System.Windows.Forms.MessageBox]::Show(
+            $msg,
+            "Desinstalar mpv.net + dependencias",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        )
+
+        if ($r -eq [System.Windows.Forms.DialogResult]::Yes) {
+            Uninstall-Dependency -ChocoPkg "mpv.net" -FriendlyName "mpv.net" -LabelRef ([ref]$lblMpvNet)
+            try { choco uninstall mpvnet.portable -y | Out-Null } catch {}
+            try { choco uninstall "Microsoft .NET 6 Desktop Runtime" -y | Out-Null } catch {}
+        }
+    })
     function Update-LocalDepsText {
         $ytVer  = (Get-ToolVersion -Command "yt-dlp" -ArgsForVersion "--version" -Parse "FirstLine")
         $ffVer  = (Get-ToolVersion -Command "ffmpeg" -ArgsForVersion "-version"  -Parse "FirstLine")
@@ -2742,98 +2797,6 @@ $btnPickDestino.Add_Click({
         $txtDestino.Text = $script:ultimaRutaDescarga
         Set-IniValue -Section "ruta" -Key "Destino" -Value $script:ultimaRutaDescarga
         Write-Host ("[DESTINO] Carpeta configurada: {0}" -f $script:ultimaRutaDescarga) -ForegroundColor Cyan
-    }
-})
-$btnYtRefresh.Add_Click({
-    Update-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -CommandName "yt-dlp" -LabelRef ([ref]$lblYtDlp) -VersionArgs "--version" -Parse "FirstLine"
-})
-$btnYtUninstall.Add_Click({
-    Uninstall-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -LabelRef ([ref]$lblYtDlp)
-})
-$btnFfmpegRefresh.Add_Click({
-    Update-Dependency -ChocoPkg "ffmpeg" -FriendlyName "ffmpeg" -CommandName "ffmpeg" -LabelRef ([ref]$lblFfmpeg) -VersionArgs "-version" -Parse "FirstLine"
-})
-$btnFfmpegUninstall.Add_Click({
-    Uninstall-Dependency -ChocoPkg "ffmpeg" -FriendlyName "ffmpeg" -LabelRef ([ref]$lblFfmpeg)
-})
-$btnNodeRefresh.Add_Click({
-    Update-Dependency -ChocoPkg "nodejs-lts" -FriendlyName "Node.js" -CommandName "node" -LabelRef ([ref]$lblNode) -VersionArgs "--version" -Parse "FirstLine"
-})
-$btnNodeUninstall.Add_Click({
-    Uninstall-Dependency -ChocoPkg "nodejs-lts" -FriendlyName "Node.js" -LabelRef ([ref]$lblNode)
-})
-$btnMpvNetRefresh.Add_Click({
-     if (-not (Ensure-DotNet6DesktopRuntime)) {
-        return
-    }
-    Update-Dependency -ChocoPkg "mpv.net" -FriendlyName "mpv.net" -CommandName "mpvnet" -LabelRef ([ref]$lblMpvNet) -VersionArgs "--version" -Parse "FirstLine"
-})
-$btnMpvNetUninstall.Add_Click({
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-        [System.Windows.Forms.MessageBox]::Show(
-            "Chocolatey no está disponible. No se puede desinstalar mpv.net, mpvnet.portable ni .NET 6 Desktop Runtime.",
-            "Chocolatey requerido",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Warning
-        ) | Out-Null
-        return
-    }
-
-    $msg = "Se desinstalarán los siguientes componentes:" +
-           [Environment]::NewLine +
-           " • mpv.net" + [Environment]::NewLine +
-           " • mpvnet.portable" + [Environment]::NewLine +
-           " • Microsoft .NET 6 Desktop Runtime" + [Environment]::NewLine + [Environment]::NewLine +
-           "¿Deseas continuar?"
-
-    $r = [System.Windows.Forms.MessageBox]::Show(
-        $msg,
-        "Desinstalar mpv.net + dependencias",
-        [System.Windows.Forms.MessageBoxButtons]::YesNo,
-        [System.Windows.Forms.MessageBoxIcon]::Warning
-    )
-
-    if ($r -ne [System.Windows.Forms.DialogResult]::Yes) {
-        return
-    }
-    Uninstall-Dependency -ChocoPkg "mpv.net" `
-                         -FriendlyName "mpv.net" `
-                         -LabelRef ([ref]$lblMpvNet)
-    Write-Host "[UNINSTALL] Intentando desinstalar mpvnet.portable..." -ForegroundColor Cyan
-    try {
-        Start-Process -FilePath "choco" `
-            -ArgumentList @("uninstall","mpvnet.portable","-y") `
-            -NoNewWindow -Wait
-
-        Write-Host "`t[OK] mpvnet.portable desinstalado (o no estaba instalado)." -ForegroundColor Green
-    } catch {
-        Write-Host "`t[ERROR] No se pudo desinstalar mpvnet.portable: $_" -ForegroundColor Red
-    }
-
-    # 3) Desinstalar también .NET 6 Desktop Runtime
-    Write-Host "[UNINSTALL] Desinstalando .NET 6 Desktop Runtime..." -ForegroundColor Cyan
-    try {
-        Start-Process -FilePath "choco" `
-            -ArgumentList @("uninstall","dotnet-6.0-desktopruntime","-y") `
-            -NoNewWindow -Wait
-
-        Write-Host "`t[OK] .NET 6 Desktop Runtime desinstalado." -ForegroundColor Green
-
-        [System.Windows.Forms.MessageBox]::Show(
-            "Se desinstaló mpv.net, mpvnet.portable y Microsoft .NET 6 Desktop Runtime.",
-            "Desinstalación completada",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Information
-        ) | Out-Null
-    }
-    catch {
-        Write-Host "`t[ERROR] Falló desinstalación de .NET 6 Desktop Runtime: $_" -ForegroundColor Red
-        [System.Windows.Forms.MessageBox]::Show(
-            "No se pudo desinstalar .NET 6 Desktop Runtime automáticamente. Revisa la consola o desinstálalo manualmente.",
-            "Error al desinstalar .NET 6",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Error
-        ) | Out-Null
     }
 })
     $formPrincipal.Controls.Add($btnExit)
