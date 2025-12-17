@@ -2144,7 +2144,6 @@ function Show-AppInfo {
         }
         # Agregamos estado de .NET 6
         $list += $dot6Line
-        $txtDeps.Text = ($list -join [Environment]::NewLine)
     }
     Update-LocalDepsText
     # Proyectos + descripciones
