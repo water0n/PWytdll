@@ -1,0 +1,32 @@
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/PSScriptAnalyzerSettings.psd1
+
+# PowerShell
+*.ps1xml
+*.pssc
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Project
+release/
+*.zip
+*.log
+dztools-release.zip
+estructura.txt
+Pruebas_01.ps1
+tools.ps1
+_github_token.ps1
+_limpiadorderelease.ps1
+
+# Temporal
+C:\Temp\ytdll\
+C:\Temp\icos\
+__pycache__/
+*.pyc
+
+# Chocolatey
+C:\Choco\
