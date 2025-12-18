@@ -6,7 +6,40 @@ chcp 65001 > $null
 [Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
 $OutputEncoding = [Console]::OutputEncoding
 
-$global:version = "beta.25.12.03.1046"
+# Leer versión desde version.json
+function Get-VersionFromJson {
+    param([string]$JsonPath = "version.json")
+
+    if (Test-Path $JsonPath) {
+        try {
+            $jsonContent = Get-Content -Path $JsonPath -Raw -ErrorAction Stop
+            $versionData = $jsonContent | ConvertFrom-Json
+
+            # Primero intenta con "Version" (mayúscula V)
+            $version = $versionData.Version
+            # Si está vacío, intenta con "version" (minúscula v)
+            if ([string]::IsNullOrWhiteSpace($version)) {
+                $version = $versionData.version
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($version)) {
+                Write-Host "✓ Versión cargada desde $JsonPath: $version" -ForegroundColor Green
+                return $version
+            }
+        } catch {
+            Write-Host "✗ Error leyendo $JsonPath: $_" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "✗ Archivo $JsonPath no encontrado" -ForegroundColor Yellow
+    }
+
+    # Si falla, usar versión por defecto
+    return "beta.25.12.03.1046"
+}
+
+# Obtener la ruta del archivo version.json (mismo nivel que main.ps1)
+$versionJsonPath = Join-Path $PSScriptRoot "version.json"
+$global:version = Get-VersionFromJson -JsonPath $versionJsonPath
 
 # Cargar ensamblados de Windows Forms y Drawing
 try {
@@ -39,6 +72,12 @@ try {
 if (Get-Command Set-ExecutionPolicy -ErrorAction SilentlyContinue) {
     Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 }
+
+# Resto del código...
+Write-Host "`n=============================================" -ForegroundColor DarkCyan
+Write-Host "                   YTDLL                       " -ForegroundColor Green
+Write-Host ("              Versión: {0}" -f $global:version) -ForegroundColor Green
+Write-Host "=============================================" -ForegroundColor DarkCyan
 
 # Importar módulos
 Write-Host "`nImportando módulos..." -ForegroundColor Yellow
