@@ -23,11 +23,12 @@ function Get-VersionFromJson {
             }
 
             if (-not [string]::IsNullOrWhiteSpace($version)) {
-                Write-Host "✓ Versión cargada desde $JsonPath: $version" -ForegroundColor Green
+                Write-Host "✓ Versión cargada desde $JsonPath $version" -ForegroundColor Green
                 return $version
             }
         } catch {
-            Write-Host "✗ Error leyendo $JsonPath: $_" -ForegroundColor Yellow
+            # Usar formato de cadena para evitar problemas con $_
+            Write-Host ("✗ Error leyendo {0}: {1}" -f $JsonPath, $_.Exception.Message) -ForegroundColor Yellow
         }
     } else {
         Write-Host "✗ Archivo $JsonPath no encontrado" -ForegroundColor Yellow
@@ -47,7 +48,7 @@ try {
     Add-Type -AssemblyName System.Windows.Forms
     Write-Host "✓ System.Windows.Forms cargado" -ForegroundColor Green
 } catch {
-    Write-Host "✗ Error cargando System.Windows.Forms: $_" -ForegroundColor Red
+    Write-Host ("✗ Error cargando System.Windows.Forms: {0}" -f $_.Exception.Message) -ForegroundColor Red
     pause
     exit 1
 }
@@ -56,7 +57,7 @@ try {
     Add-Type -AssemblyName System.Drawing
     Write-Host "✓ System.Drawing cargado" -ForegroundColor Green
 } catch {
-    Write-Host "✗ Error cargando System.Drawing: $_" -ForegroundColor Red
+    Write-Host ("✗ Error cargando System.Drawing: {0}" -f $_.Exception.Message) -ForegroundColor Red
     pause
     exit 1
 }
@@ -65,7 +66,7 @@ try {
     [System.Windows.Forms.Application]::EnableVisualStyles()
     Write-Host "✓ VisualStyles habilitado" -ForegroundColor Green
 } catch {
-    Write-Host "✗ Error habilitando VisualStyles: $_" -ForegroundColor Red
+    Write-Host ("✗ Error habilitando VisualStyles: {0}" -f $_.Exception.Message) -ForegroundColor Red
 }
 
 # Configurar política de ejecución
@@ -99,15 +100,15 @@ foreach ($module in $modules) {
             Import-Module $modulePath -Force -ErrorAction Stop -DisableNameChecking
             Write-Host "  ✓ $module" -ForegroundColor Green
         } catch {
-            Write-Host "  ✗ Error importando módulo: $module" -ForegroundColor Red
-            Write-Host "    Ruta    : $modulePath" -ForegroundColor DarkYellow
-            Write-Host "    Mensaje : $($_.Exception.Message)" -ForegroundColor Yellow
-            Write-Host "    Detalle : $($_.InvocationInfo.PositionMessage)" -ForegroundColor DarkYellow
-            Write-Host "    Stack   : $($_.ScriptStackTrace)" -ForegroundColor DarkGray
+            Write-Host ("  ✗ Error importando módulo: {0}" -f $module) -ForegroundColor Red
+            Write-Host ("    Ruta    : {0}" -f $modulePath) -ForegroundColor DarkYellow
+            Write-Host ("    Mensaje : {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+            Write-Host ("    Detalle : {0}" -f $_.InvocationInfo.PositionMessage) -ForegroundColor DarkYellow
+            Write-Host ("    Stack   : {0}" -f $_.ScriptStackTrace) -ForegroundColor DarkGray
             throw
         }
     } else {
-        Write-Host "  ✗ $module no encontrado" -ForegroundColor Red
+        Write-Host ("  ✗ {0} no encontrado" -f $module) -ForegroundColor Red
     }
 }
 
@@ -117,7 +118,7 @@ if (!(Test-Path -Path "C:\Temp")) {
         New-Item -ItemType Directory -Path "C:\Temp" -Force | Out-Null
         Write-Host "Carpeta 'C:\Temp' creada." -ForegroundColor Green
     } catch {
-        Write-Host "Error creando C:\Temp: $_" -ForegroundColor Yellow
+        Write-Host ("Error creando C:\Temp: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
     }
 }
 
@@ -126,15 +127,15 @@ try {
     $debugEnabled = Initialize-DzToolsConfig
     Write-DzDebug "`t[DEBUG]Configuración de debug cargada (debug=$debugEnabled)" -Color DarkGray
 } catch {
-    Write-Host "Advertencia: No se pudo inicializar la configuración de debug. $_" -ForegroundColor Yellow
+    Write-Host ("Advertencia: No se pudo inicializar la configuración de debug. {0}" -f $_.Exception.Message) -ForegroundColor Yellow
 }
 
 # Iniciar aplicación
 try {
     Start-Application
 } catch {
-    Write-Host "Error fatal: $_" -ForegroundColor Red
-    Write-Host "Stack Trace: $($_.Exception.StackTrace)" -ForegroundColor Red
+    Write-Host ("Error fatal: {0}" -f $_.Exception.Message) -ForegroundColor Red
+    Write-Host ("Stack Trace: {0}" -f $_.Exception.StackTrace) -ForegroundColor Red
     pause
     exit 1
 }
