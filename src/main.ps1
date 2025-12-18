@@ -125,7 +125,7 @@ if (!(Test-Path -Path "C:\Temp")) {
 # Inicializar configuración
 try {
     $debugEnabled = Initialize-DzToolsConfig
-    Write-DzDebug "`t[DEBUG]Configuración de debug cargada (debug=$debugEnabled)" -Color DarkGray
+    Write-DebugLog "`t[DEBUG] Configuración de debug cargada (debug=$debugEnabled)" -ForegroundColor DarkGray
 } catch {
     Write-Host ("Advertencia: No se pudo inicializar la configuración de debug. {0}" -f $_.Exception.Message) -ForegroundColor Yellow
 }
