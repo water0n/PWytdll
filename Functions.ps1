@@ -1,25 +1,4 @@
-﻿<#
-.SYNOPSIS
-    YTDLL — Módulo de Funciones
-    Lógica de negocio: configuración, historial, formatos de video/audio,
-    miniaturas, invocación de procesos externos (yt-dlp, ffmpeg).
-
-    Compatible con PowerShell 5.x
-    Cargado mediante dot-sourcing desde Main.ps1
-
-    NOTA DE ACOPLAMIENTO:
-    Algunas funciones (Invoke-CaptureResponsive, Invoke-YtDlpConsoleProgress,
-    Fetch-Formats, Populate-FormatCombos, Invoke-ConsultaFromUI, etc.) acceden
-    a controles de la GUI ($lblEstadoConsulta, $cmbVideoFmt, etc.) a través del
-    scope compartido que genera el dot-sourcing.  Estas variables deben existir
-    antes de que esas funciones sean *llamadas* (no cuando son definidas).
-#>
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  CONFIGURACIÓN  (config.ini)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-function Get-IniValue {
+﻿function Get-IniValue {
     param(
         [string]$Section,
         [string]$Key,
@@ -75,18 +54,10 @@ function Set-IniValue {
     catch { Write-Host "[CONFIG] Error guardando configuración: $($_.Exception.Message)" -ForegroundColor Red }
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  LOGGING / DEBUG
-# ═══════════════════════════════════════════════════════════════════════════════
-
 function Write-DebugLog {
     param([string]$Message, [string]$ForegroundColor = "Yellow")
     if ($global:DebugEnabled) { Write-Host $Message -ForegroundColor $ForegroundColor }
 }
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  UTILIDADES DE CADENAS Y ARCHIVOS
-# ═══════════════════════════════════════════════════════════════════════════════
 
 function Get-CleanUrl {
     param([Parameter(Mandatory=$true)][string]$Url)
@@ -128,10 +99,6 @@ function Save-Bytes {
     [System.IO.File]::WriteAllBytes($Path, $Bytes)
     return $Path
 }
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  HISTORIAL DE URLs
-# ═══════════════════════════════════════════════════════════════════════════════
 
 function Clear-History {
     try { Set-Content -LiteralPath $script:LogFile -Value @() -Encoding UTF8 } catch {}
@@ -202,10 +169,6 @@ function Get-HistoryUrls {
         return $urls
     } catch { return @() }
 }
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  FORMATOS DE VIDEO/AUDIO
-# ═══════════════════════════════════════════════════════════════════════════════
 
 function New-FormatDisplay {
     param([string]$Id, [string]$Label)
@@ -290,10 +253,6 @@ function Print-FormatsTable {
     }
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  DETECCIÓN DE URL / VIDEO ID
-# ═══════════════════════════════════════════════════════════════════════════════
-
 function Get-YouTubeVideoId {
     param([Parameter(Mandatory=$true)][string]$Url)
     foreach ($pattern in @(
@@ -317,20 +276,14 @@ function Test-YouTubePlaylist {
 }
 
 function Get-CurrentUrl {
-    # Nota: referencia $txtUrl (control GUI, accesible por scope compartido)
+
     if (-not $txtUrl) { return "" }
     $t = ($txtUrl.Text).Trim()
     if ($t -eq $global:UrlPlaceholder) { return "" }
     return $t
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  INVOCACIÓN DE PROCESOS EXTERNOS
-# ═══════════════════════════════════════════════════════════════════════════════
-
 function Invoke-Capture {
-    <#
-    .SYNOPSIS Ejecuta un proceso y captura stdout/stderr. Retorna @{ExitCode; StdOut; StdErr}. #>
     param(
         [Parameter(Mandatory=$true)][string]$ExePath,
         [string[]]$Args = @(),
@@ -343,10 +296,7 @@ function Invoke-Capture {
     $psi.RedirectStandardError  = $true
     $psi.UseShellExecute        = $false
     $psi.CreateNoWindow         = $true
-    Write-DebugLog "Exec: $ExePath $($psi.Arguments)"
-    $psi.RedirectStandardError  = $true
-    $psi.UseShellExecute        = $false
-    $psi.CreateNoWindow         = $true
+    Write-DebugLog "[DEBUG] Invoke-Capture: $ExePath $($psi.Arguments)" -ForegroundColor DarkGray
     $p = New-Object System.Diagnostics.Process
     $p.StartInfo = $psi
     [void]$p.Start()
@@ -358,11 +308,6 @@ function Invoke-Capture {
 }
 
 function Invoke-CaptureResponsive {
-    <#
-    .SYNOPSIS
-        Igual que Invoke-Capture pero mantiene la GUI responsiva (DoEvents) durante la espera.
-        Actualiza $lblEstadoConsulta con puntos de progreso (scope compartido con GUI).
-    #>
     param(
         [Parameter(Mandatory=$true)][string]$ExePath,
         [string[]]$Args       = @(),
@@ -377,7 +322,8 @@ function Invoke-CaptureResponsive {
     $outFile = Join-Path $tmpDir ("proc_stdout_{0}.log" -f ([guid]::NewGuid()))
     $errFile = Join-Path $tmpDir ("proc_stderr_{0}.log" -f ([guid]::NewGuid()))
     $argLine = ($Args | ForEach-Object { if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ } }) -join ' '
-    Write-DebugLog "Exec: $ExePath $argLine"`n    $proc    = Start-Process -FilePath $ExePath -ArgumentList $argLine `
+    Write-DebugLog "[DEBUG] Invoke-CaptureResponsive: $ExePath $argLine" -ForegroundColor DarkGray
+    $proc = Start-Process -FilePath $ExePath -ArgumentList $argLine `
                  -NoNewWindow -PassThru `
                  -RedirectStandardOutput $outFile `
                  -RedirectStandardError  $errFile
@@ -406,8 +352,6 @@ function Invoke-CaptureResponsive {
 }
 
 function Invoke-YtDlpQuery {
-    <#
-    .SYNOPSIS Invoca yt-dlp de forma asíncrona y retorna stdout/stderr completos al terminar. #>
     param(
         [Parameter(Mandatory=$true)][string]$ExePath,
         [Parameter(Mandatory=$true)][string[]]$Args,
@@ -442,11 +386,6 @@ function Invoke-YtDlpQuery {
 }
 
 function Invoke-YtDlpConsoleProgress {
-    <#
-    .SYNOPSIS
-        Ejecuta yt-dlp mostrando el progreso en consola y actualizando la GUI en tiempo real.
-        Referencia $lblEstadoConsulta por scope compartido.
-    #>
     param(
         [Parameter(Mandatory=$true)][string]$ExePath,
         [Parameter(Mandatory=$true)][string[]]$Args,
@@ -538,10 +477,6 @@ function Invoke-YtDlpConsoleProgress {
     return $code
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  METADATOS Y FORMATOS
-# ═══════════════════════════════════════════════════════════════════════════════
-
 function Get-Metadata {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return $null }
@@ -617,10 +552,6 @@ function Get-BestStreamUrl {
     if ($res.ExitCode -ne 0) { return $null }
     return (($res.StdOut -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)).Trim()
 }
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  MINIATURAS
-# ═══════════════════════════════════════════════════════════════════════════════
 
 function Get-TempThumbPattern {
     return (Join-Path ([System.IO.Path]::GetTempPath()) "ytdll_thumb_*")
@@ -757,13 +688,6 @@ function Build-PreviewFromStream {
     if ($p.ExitCode -eq 0 -and (Test-Path $tmp)) { return $tmp }
     return $null
 }
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  OPERACIONES MIXTAS GUI + LÓGICA
-#  Estas funciones actualizan controles GUI (lblEstadoConsulta, cmbVideoFmt, etc.)
-#  a través del scope compartido. Deben llamarse después de que GUI.ps1 haya
-#  construido los controles.
-# ═══════════════════════════════════════════════════════════════════════════════
 
 function Fetch-Formats {
     param([Parameter(Mandatory=$true)][string]$Url)
@@ -939,7 +863,6 @@ function Invoke-ConsultaFromUI {
         $picPreview.Source = $null
         $btnDescargar.IsEnabled = $true; $txtUrl.IsEnabled = $true
 
-        # ── Detectar error específico de YouTube bot/cookies ───────────────────
         $isYouTubeBot = $res.StdErr -match "Sign in to confirm" -or
                         $res.StdErr -match "not a bot" -or
                         $res.StdErr -match "Use --cookies"
@@ -968,50 +891,114 @@ function Invoke-ConsultaFromUI {
     }
 }
 
-
-
-
 function Export-BrowserCookies {
     param([string]$Browser)
-    try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch {
-        [System.Windows.MessageBox]::Show("yt-dlp no está disponible.", "Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
+    Write-Host "[COOKIES] === Iniciando extraccion de cookies: $Browser ===" -ForegroundColor Cyan
+    Write-DebugLog "[DEBUG] Export-BrowserCookies: Browser='$Browser'" -ForegroundColor Cyan
+
+    try { $yt = Get-Command yt-dlp -ErrorAction Stop }
+    catch {
+        Write-Host "[COOKIES] ERROR: yt-dlp no disponible" -ForegroundColor Red
+        [System.Windows.MessageBox]::Show("yt-dlp no esta disponible.","Error",[System.Windows.MessageBoxButton]::OK,[System.Windows.MessageBoxImage]::Error) | Out-Null
         return $null
     }
+    Write-DebugLog "[DEBUG] yt-dlp: $($yt.Source)" -ForegroundColor DarkGray
 
     $tmpCookie = Join-Path $env:TEMP "ytdll_cookies_$Browser.txt"
-    if (Test-Path $tmpCookie) { Remove-Item $tmpCookie -Force -ErrorAction SilentlyContinue }
+    Write-DebugLog "[DEBUG] Ruta cookies: $tmpCookie" -ForegroundColor DarkGray
+    if (Test-Path $tmpCookie) {
+        Write-DebugLog "[DEBUG] Eliminando cookies previas..." -ForegroundColor DarkGray
+        Remove-Item $tmpCookie -Force -ErrorAction SilentlyContinue
+    }
+
+    $perfiles = @{
+        "chrome"  = "$env:LOCALAPPDATA\Google\Chrome\User Data"
+        "brave"   = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data"
+        "firefox" = "$env:APPDATA\Mozilla\Firefox\Profiles"
+        "edge"    = "$env:LOCALAPPDATA\Microsoft\Edge\User Data"
+        "opera"   = "$env:APPDATA\Opera Software\Opera Stable"
+        "vivaldi" = "$env:LOCALAPPDATA\Vivaldi\User Data"
+    }
+    if ($perfiles.ContainsKey($Browser)) {
+        $perfil = $perfiles[$Browser]
+        Write-DebugLog "[DEBUG] Perfil esperado en: $perfil" -ForegroundColor DarkGray
+        if (Test-Path $perfil) {
+            Write-DebugLog "[DEBUG] Perfil de $Browser ENCONTRADO" -ForegroundColor Green
+        } else {
+            Write-Host "[COOKIES] ADVERTENCIA: Perfil de $Browser no encontrado en $perfil" -ForegroundColor Yellow
+        }
+    }
+
+    $procName = @{ "chrome"="chrome"; "brave"="brave"; "firefox"="firefox"; "edge"="msedge"; "opera"="opera"; "vivaldi"="vivaldi" }
+    if ($procName.ContainsKey($Browser)) {
+        $running = Get-Process -Name $procName[$Browser] -ErrorAction SilentlyContinue
+        if ($running) {
+            Write-Host "[COOKIES] ADVERTENCIA: $Browser tiene $($running.Count) proceso(s) corriendo. Puede fallar la extraccion." -ForegroundColor Yellow
+            Write-DebugLog "[DEBUG] PIDs de $Browser`: $($running.Id -join ', ')" -ForegroundColor Yellow
+        } else {
+            Write-DebugLog "[DEBUG] $Browser no tiene procesos activos. OK para extraer cookies." -ForegroundColor Green
+        }
+    }
 
     $lblEstadoConsulta.Text     = "Extrayendo cookies de $Browser..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
 
-    Write-Host "[COOKIES] Extrayendo cookies de $Browser..." -ForegroundColor Cyan
-    # Usamos robots.txt como URL mínima para forzar la extracción sin descargar nada
-    $cookieArgs = @("--cookies-from-browser", $Browser, "--cookies", $tmpCookie,
-                    "--ignore-config", "--no-warnings",
-                    "https://www.youtube.com/robots.txt")
-    $res = Invoke-CaptureResponsive -ExePath $yt.Source -Args $cookieArgs -WorkingText "Extrayendo cookies de $Browser" -TimeoutSec 120
+    $cookieArgs = @(
+        "--cookies-from-browser", $Browser,
+        "--cookies", $tmpCookie,
+        "--ignore-config", "--no-warnings",
+        "https://www.youtube.com/robots.txt"
+    )
+    Write-Host "[COOKIES] Comando: yt-dlp $($cookieArgs -join ' ')" -ForegroundColor DarkCyan
 
-    if ($res.ExitCode -ne 0 -or -not (Test-Path $tmpCookie)) {
+    $res = Invoke-CaptureResponsive -ExePath $yt.Source -Args $cookieArgs `
+               -WorkingText "Extrayendo cookies de $Browser" -TimeoutSec 180
+
+    Write-Host "[COOKIES] ExitCode: $($res.ExitCode)" -ForegroundColor Cyan
+    if (-not [string]::IsNullOrWhiteSpace($res.StdOut)) {
+        Write-DebugLog "[DEBUG] StdOut: $($res.StdOut)" -ForegroundColor DarkGray
+    }
+    if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) {
+        Write-Host "[COOKIES] StdErr: $($res.StdErr)" -ForegroundColor Yellow
+    }
+
+    $existe = Test-Path $tmpCookie
+    $tamano = if ($existe) { (Get-Item $tmpCookie).Length } else { 0 }
+    Write-DebugLog "[DEBUG] Archivo existe: $existe | Tamano: $tamano bytes" -ForegroundColor DarkGray
+
+    if ($res.ExitCode -ne 0 -or -not $existe -or $tamano -lt 50) {
         $lblEstadoConsulta.Text     = "ERROR: No se pudieron extraer cookies de $Browser"
         $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
-        Write-Host "[COOKIES] Error extrayendo cookies: $($res.StdErr)" -ForegroundColor Red
+
+        $detail = if ($res.ExitCode -eq -1) {
+            "Tiempo de espera agotado (180s). Cierra $Browser completamente y reintenta."
+        } elseif (-not $existe) {
+            "yt-dlp termino sin crear el archivo. Error: $($res.StdErr)"
+        } elseif ($tamano -lt 50) {
+            "Archivo de cookies creado pero vacio ($tamano bytes). Error: $($res.StdErr)"
+        } else {
+            $res.StdErr
+        }
+
+        Write-Host "[COOKIES] FALLO: $detail" -ForegroundColor Red
         [System.Windows.MessageBox]::Show(
             "No se pudieron extraer las cookies de $Browser.`n`n" +
-            "Asegúrate de:`n" +
-            "  1. Tener $Browser instalado`n" +
-            "  2. Cerrar $Browser completamente antes de intentarlo`n" +
-            "  3. Haber iniciado sesión en YouTube en ese navegador`n`n" +
-            "Detalles: $($res.StdErr)",
-            "Error de Cookies",
+            "Pasos para solucionar:`n" +
+            "  1. Cierra $Browser completamente`n" +
+            "     (incluyendo procesos en segundo plano / bandeja del sistema)`n" +
+            "  2. Asegurate de haber iniciado sesion en YouTube en $Browser`n" +
+            "  3. Vuelve a intentarlo`n`n" +
+            "Diagnostico:`n$detail",
+            "Error al extraer cookies de $Browser",
             [System.Windows.MessageBoxButton]::OK,
             [System.Windows.MessageBoxImage]::Error
         ) | Out-Null
         return $null
     }
 
-    Write-Host "[COOKIES] Cookies extraidas de $Browser -> $tmpCookie" -ForegroundColor Green
-    $lblEstadoConsulta.Text     = "Cookies de $Browser configuradas correctamente"
+    Write-Host "[COOKIES] Exito: $tmpCookie ($tamano bytes)" -ForegroundColor Green
+    $lblEstadoConsulta.Text     = "Cookies de $Browser listas ($tamano bytes)"
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkGreen
     return $tmpCookie
 }
