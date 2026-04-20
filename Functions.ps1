@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     YTDLL — Módulo de Funciones
     Lógica de negocio: configuración, historial, formatos de video/audio,
@@ -567,7 +567,11 @@ function Extract-VideoFromPlaylist {
     param([Parameter(Mandatory=$true)][string]$Url)
     try {
         $yt  = Get-Command yt-dlp -ErrorAction Stop
-        $res = Invoke-Capture -ExePath $yt.Source -Args @("--flat-playlist","--print","url","--no-warnings","--playlist-items","1",$Url)
+        $tmpArgs = @("--flat-playlist","--print","url","--no-warnings","--playlist-items","1")
+        if ($script:cookiesBrowser)           { $tmpArgs += @("--cookies-from-browser", $script:cookiesBrowser) }
+        elseif ($script:cookiesPath)          { $tmpArgs += @("--cookies",$script:cookiesPath) }
+        $tmpArgs += $Url
+        $res = Invoke-Capture -ExePath $yt.Source -Args $tmpArgs
         if ($res.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($res.StdOut)) {
             $first = ($res.StdOut -split "`r?`n" | Where-Object { $_ -match 'watch\?v=' } | Select-Object -First 1)
             if ($first) { return if ($first -match '^https?://') { $first.Trim() } else { "https://www.youtube.com/watch?v=$first" } }
@@ -623,7 +627,11 @@ function Get-TempThumbPattern {
 function Get-ThumbnailListFromYtDlp {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return @() }
-    $res = Invoke-Capture -ExePath $yt.Source -Args @("--list-thumbnails",$Url)
+    $tmpArgs = @("--list-thumbnails")
+    if ($script:cookiesBrowser)           { $tmpArgs += @("--cookies-from-browser", $script:cookiesBrowser) }
+    elseif ($script:cookiesPath)          { $tmpArgs += @("--cookies",$script:cookiesPath) }
+    $tmpArgs += $Url
+    $res = Invoke-Capture -ExePath $yt.Source -Args $tmpArgs
     if ($res.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($res.StdOut)) { return @() }
     $lines = $res.StdOut -split "`r?`n"
     $startIndex = -1
@@ -773,7 +781,10 @@ function Fetch-Formats {
     }
     $lblEstadoConsulta.Text     = "Obteniendo lista de formatos..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
-    $args1 = @("-J","--no-playlist","--ignore-config","--no-warnings",$Url)
+    $args1 = @("-J","--no-playlist","--ignore-config","--no-warnings")
+    if ($script:cookiesBrowser)           { $args1 += @("--cookies-from-browser", $script:cookiesBrowser) }
+    elseif ($script:cookiesPath)          { $args1 += @("--cookies",$script:cookiesPath) }
+    $args1 += $Url
     $obj   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Obteniendo formatos" -TimeoutSec 30
     if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
         $lblEstadoConsulta.Text = "Reintentando obtención de formatos..."
@@ -880,7 +891,10 @@ function Invoke-ConsultaFromUI {
     }
     $btnDescargar.IsEnabled = $false; $txtUrl.IsEnabled = $false
     if ($script:ultimaURL -ne $Url) { $script:videoConsultado = $false; $script:formatsEnumerated = $false }
-    $args = @("--no-playlist","--no-warnings","--ignore-config","--print","title","--print","thumbnail","--print","id",$Url)
+    $args = @("--no-playlist","--no-warnings","--ignore-config","--print","title","--print","thumbnail","--print","id")
+    if ($script:cookiesBrowser)           { $args += @("--cookies-from-browser", $script:cookiesBrowser) }
+    elseif ($script:cookiesPath)          { $args += @("--cookies",$script:cookiesPath) }
+    $args += $Url
     $lblEstadoConsulta.Text     = "Consultando video..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
@@ -919,7 +933,7 @@ function Invoke-ConsultaFromUI {
         $script:formatsEnumerated = $false
         $lblEstadoConsulta.Text     = "Error al consultar la URL"
         $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
-        $picPreview.Image = $null
+        $picPreview.Source = $null
         $btnDescargar.IsEnabled = $true; $txtUrl.IsEnabled = $true
         $errorMsg = "yt-dlp devolvió error al consultar la URL."
         if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) { $errorMsg += "`n`nError: $($res.StdErr)" }
@@ -928,3 +942,4 @@ function Invoke-ConsultaFromUI {
         return $false
     }
 }
+
