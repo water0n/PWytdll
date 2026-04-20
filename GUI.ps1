@@ -27,11 +27,11 @@ $ColorSubText     = "#86868B"
     <Window.Resources>
         <!-- Estilos base -->
         <Style TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI, -apple-system, BlinkMacSystemFont"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="Foreground" Value="$ColorText"/>
         </Style>
         <Style TargetType="Label">
-            <Setter Property="FontFamily" Value="Segoe UI Semibold, -apple-system, BlinkMacSystemFont"/>
+            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
             <Setter Property="Foreground" Value="$ColorText"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="0,0,0,5"/>
@@ -103,7 +103,7 @@ $ColorSubText     = "#86868B"
                 <Grid>
                     <TextBlock Text="YTDLL" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,15,0">
-                        <Button Name="btnPickCookies" Content="🍪" ToolTip="Cookies.txt" Background="Transparent" Foreground="$ColorSubText" BorderThickness="0" FontSize="18" Margin="0,0,10,0" Cursor="Hand"/>
+                        <Button Name="btnPickCookies" Content="&amp;#x1F36A;" ToolTip="Cookies.txt" Background="Transparent" Foreground="$ColorSubText" BorderThickness="0" FontSize="18" Margin="0,0,10,0" Cursor="Hand"/>
                         <Button Name="btnInfo" Content="?" ToolTip="Información" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Width="24" Height="24" FontSize="14" FontWeight="Bold" Cursor="Hand">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
@@ -122,8 +122,11 @@ $ColorSubText     = "#86868B"
                 
                 <!-- URL Input -->
                 <TextBox Name="txtUrl" Text="Escribe la URL del video" FontSize="16" TextAlignment="Center" Foreground="#8E8E93" Height="45" Margin="0,0,0,5" VerticalContentAlignment="Center"/>
-                <Button Name="btnUrlHistory" Content="▾ Historial" Background="Transparent" Foreground="$ColorPrimary" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right" Margin="0,0,0,20"/>
-                <ContextMenu x:Name="ctxUrlHistory" Placement="Bottom" PlacementTarget="{Binding ElementName=btnUrlHistory}"/>
+                <Button Name="btnUrlHistory" Content="&amp;#x25BE; Historial" Background="Transparent" Foreground="$ColorPrimary" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right" Margin="0,0,0,20">
+                    <Button.ContextMenu>
+                        <ContextMenu x:Name="ctxUrlHistory" Placement="Bottom" PlacementTarget="{Binding RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </Button.ContextMenu>
+                </Button>
 
                 <!-- Destination -->
                 <Label Content="Carpeta de destino"/>
@@ -133,7 +136,7 @@ $ColorSubText     = "#86868B"
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox Name="txtDestino" Grid.Column="0" IsReadOnly="True" Background="#E5E5EA" Foreground="$ColorSubText"/>
-                    <Button Name="btnPickDestino" Grid.Column="1" Content="📁" Width="36" Margin="10,0,0,0" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Cursor="Hand">
+                    <Button Name="btnPickDestino" Grid.Column="1" Content="&amp;#x1F4C1;" Width="36" Margin="10,0,0,0" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Cursor="Hand">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border Background="{TemplateBinding Background}" CornerRadius="8">
@@ -476,7 +479,7 @@ function Show-AppInfo {
         WindowStartupLocation="CenterOwner" Background="#F5F5F7" ResizeMode="NoResize">
     <Window.Resources>
         <Style TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI, -apple-system, BlinkMacSystemFont"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="Foreground" Value="#1D1D1F"/>
         </Style>
         <Style TargetType="Button">
