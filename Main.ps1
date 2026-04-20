@@ -357,8 +357,7 @@ $btnDescargar.Add_Click({
         "--no-part","--ignore-config"
     )
     $dlpArgs += $noPlaylistArg   # doble por seguridad
-    if ($script:cookiesBrowser) { $dlpArgs += @("--cookies-from-browser", $script:cookiesBrowser) }
-    elseif ($script:cookiesPath) { $dlpArgs += @("--cookies",$script:cookiesPath) }
+
     $dlpArgs += $script:ultimaURL
     $dlpArgs += @("--retries","5","--retry-sleep","2","-N","4")
 
@@ -413,5 +412,6 @@ try { $txtDestino.Text = $script:ultimaRutaDescarga } catch {}
 #  MOSTRAR LA APLICACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 $formPrincipal.ShowDialog() | Out-Null
+
 
 

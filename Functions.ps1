@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     YTDLL — Módulo de Funciones
     Lógica de negocio: configuración, historial, formatos de video/audio,
@@ -572,8 +572,7 @@ function Extract-VideoFromPlaylist {
     try {
         $yt  = Get-Command yt-dlp -ErrorAction Stop
         $tmpArgs = @("--flat-playlist","--print","url","--no-warnings","--playlist-items","1")
-        if ($script:cookiesBrowser)           { $tmpArgs += @("--cookies-from-browser", $script:cookiesBrowser) }
-        elseif ($script:cookiesPath)          { $tmpArgs += @("--cookies",$script:cookiesPath) }
+
         $tmpArgs += $Url
         $res = Invoke-Capture -ExePath $yt.Source -Args $tmpArgs
         if ($res.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($res.StdOut)) {
@@ -613,8 +612,7 @@ function Get-BestStreamUrl {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return $null }
     $args = @("-g","-f","best",$Url)
-    if ($script:cookiesBrowser) { $args += @("--cookies-from-browser", $script:cookiesBrowser) }
-    elseif ($script:cookiesPath) { $args += @("--cookies",$script:cookiesPath) }
+
     $res = Invoke-Capture -ExePath $yt.Source -Args $args
     if ($res.ExitCode -ne 0) { return $null }
     return (($res.StdOut -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)).Trim()
@@ -632,8 +630,7 @@ function Get-ThumbnailListFromYtDlp {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return @() }
     $tmpArgs = @("--list-thumbnails")
-    if ($script:cookiesBrowser)           { $tmpArgs += @("--cookies-from-browser", $script:cookiesBrowser) }
-    elseif ($script:cookiesPath)          { $tmpArgs += @("--cookies",$script:cookiesPath) }
+
     $tmpArgs += $Url
     $res = Invoke-Capture -ExePath $yt.Source -Args $tmpArgs
     if ($res.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($res.StdOut)) { return @() }
@@ -681,8 +678,7 @@ function Fetch-ThumbnailFile {
     $outTmpl = Join-Path $script:ThumbnailsDir "ytdll_thumb_%(id)s.%(ext)s"
     $args = @("--skip-download","--quiet","--no-warnings","--write-thumbnail","--convert-thumbnails","jpg","-o",$outTmpl,"--no-playlist")
     if ($Url -match 'youtube\.com.*list=') { $args += "--playlist-items","1" }
-    if ($script:cookiesBrowser)           { $args += @("--cookies-from-browser", $script:cookiesBrowser) }
-    elseif ($script:cookiesPath)          { $args += @("--cookies",$script:cookiesPath) }
+
     $args += $Url
     $res = Invoke-Capture -ExePath $yt.Source -Args $args
     $thumb = Get-ChildItem -Path (Join-Path $script:ThumbnailsDir "ytdll_thumb_*") -ErrorAction SilentlyContinue |
@@ -786,8 +782,7 @@ function Fetch-Formats {
     $lblEstadoConsulta.Text     = "Obteniendo lista de formatos..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     $args1 = @("-J","--no-playlist","--ignore-config","--no-warnings")
-    if ($script:cookiesBrowser)           { $args1 += @("--cookies-from-browser", $script:cookiesBrowser) }
-    elseif ($script:cookiesPath)          { $args1 += @("--cookies",$script:cookiesPath) }
+
     $args1 += $Url
     $obj   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Obteniendo formatos" -TimeoutSec 60
     if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
@@ -896,8 +891,7 @@ function Invoke-ConsultaFromUI {
     $btnDescargar.IsEnabled = $false; $txtUrl.IsEnabled = $false
     if ($script:ultimaURL -ne $Url) { $script:videoConsultado = $false; $script:formatsEnumerated = $false }
     $args = @("--no-playlist","--no-warnings","--ignore-config","--print","title","--print","thumbnail","--print","id")
-    if ($script:cookiesBrowser)           { $args += @("--cookies-from-browser", $script:cookiesBrowser) }
-    elseif ($script:cookiesPath)          { $args += @("--cookies",$script:cookiesPath) }
+
     $args += $Url
     $lblEstadoConsulta.Text     = "Consultando video..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
@@ -979,3 +973,4 @@ Detalles: $($res.StdErr)", "Error de Cookies", [System.Windows.MessageBoxButton]
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Green
     return $tmpCookie
 }
+
