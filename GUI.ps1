@@ -1,23 +1,20 @@
 ﻿<#
 .SYNOPSIS
     YTDLL — Módulo de GUI (WPF)
-    Construye la interfaz gráfica principal con Windows Presentation Foundation.
 #>
 
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 
-# ─── Variables de Color y Fuentes (WPF) ─────────────────────────────────────────
-$ColorPrimary     = "#007AFF" # Apple Blue
+$ColorPrimary     = "#007AFF"
 $ColorPrimaryDark = "#0056B3"
-$ColorAccent      = "#5E5CE6" # Indigo
+$ColorAccent      = "#5E5CE6"
 $ColorSurface     = "#FFFFFF"
 $ColorBgForm      = "#F5F5F7"
 $ColorText        = "#1D1D1F"
 $ColorSubText     = "#86868B"
 
-# ─── XAML de la Ventana Principal ──────────────────────────────────────────────
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -36,7 +33,6 @@ $ColorSubText     = "#86868B"
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="0,0,0,5"/>
         </Style>
-        <!-- Estilo de Botón Primario -->
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Background" Value="$ColorPrimary"/>
             <Setter Property="Foreground" Value="White"/>
@@ -63,7 +59,6 @@ $ColorSubText     = "#86868B"
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <!-- Estilo de TextBox -->
         <Style TargetType="TextBox">
             <Setter Property="Padding" Value="10,8"/>
             <Setter Property="FontSize" Value="14"/>
@@ -81,7 +76,6 @@ $ColorSubText     = "#86868B"
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- Estilo de ComboBox -->
         <Style TargetType="ComboBox">
             <Setter Property="Padding" Value="10,6"/>
             <Setter Property="FontSize" Value="13"/>
@@ -94,17 +88,30 @@ $ColorSubText     = "#86868B"
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> <!-- Header -->
-                <RowDefinition Height="*"/>    <!-- Content -->
-                <RowDefinition Height="Auto"/> <!-- Footer Actions -->
+                <RowDefinition Height="Auto"/> 
+                <RowDefinition Height="*"/>    
+                <RowDefinition Height="Auto"/> 
             </Grid.RowDefinitions>
 
-            <!-- Header (Draggable Area) -->
+            <!-- Header -->
             <Border Name="TitleBar" Grid.Row="0" Background="Transparent" Height="50" CornerRadius="16,16,0,0">
                 <Grid>
                     <TextBlock Text="YTDLL" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,15,0">
-                        <Button Name="btnPickCookies" Content="🍪" ToolTip="Cookies.txt" Background="Transparent" Foreground="$ColorSubText" BorderThickness="0" FontSize="18" Margin="0,0,10,0" Cursor="Hand"/>
+                        <Button Name="btnPickCookies" Content="🍪" ToolTip="Cookies" Background="Transparent" Foreground="$ColorSubText" BorderThickness="0" FontSize="18" Margin="0,0,10,0" Cursor="Hand">
+                            <Button.ContextMenu>
+                                <ContextMenu x:Name="ctxCookies" Placement="Bottom" PlacementTarget="{Binding RelativeSource={RelativeSource AncestorType=Button}}">
+                                    <MenuItem Name="miCookieEdge" Header="🔵 Edge"/>
+                                    <MenuItem Name="miCookieChrome" Header="🔴 Chrome"/>
+                                    <MenuItem Name="miCookieFirefox" Header="🦊 Firefox"/>
+                                    <MenuItem Name="miCookieBrave" Header="🦁 Brave"/>
+                                    <MenuItem Name="miCookieOpera" Header="⭕ Opera"/>
+                                    <MenuItem Name="miCookieVivaldi" Header="🟣 Vivaldi"/>
+                                    <Separator/>
+                                    <MenuItem Name="miCookieFile" Header="📁 Seleccionar archivo txt manualmente..."/>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
                         <Button Name="btnInfo" Content="?" ToolTip="Información" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Width="24" Height="24" FontSize="14" FontWeight="Bold" Cursor="Hand">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
@@ -121,14 +128,6 @@ $ColorSubText     = "#86868B"
             <!-- Main Content -->
             <StackPanel Grid.Row="1" Margin="25,5,25,15">
                 
-                <!-- URL Input -->
-                <TextBox Name="txtUrl" Text="Escribe la URL del video" FontSize="16" TextAlignment="Center" Foreground="#8E8E93" Height="45" Margin="0,0,0,5" VerticalContentAlignment="Center"/>
-                <Button Name="btnUrlHistory" Content="▾ Historial" Background="Transparent" Foreground="$ColorPrimary" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right" Margin="0,0,0,20">
-                    <Button.ContextMenu>
-                        <ContextMenu x:Name="ctxUrlHistory" Placement="Bottom" PlacementTarget="{Binding RelativeSource={RelativeSource AncestorType=Button}}"/>
-                    </Button.ContextMenu>
-                </Button>
-
                 <!-- Destination -->
                 <Label Content="Carpeta de destino"/>
                 <Grid Margin="0,0,0,15">
@@ -148,6 +147,14 @@ $ColorSubText     = "#86868B"
                     </Button>
                 </Grid>
 
+                <!-- URL Input -->
+                <TextBox Name="txtUrl" Text="BUSCAR VIDEO" FontSize="16" TextAlignment="Center" Foreground="#8E8E93" Height="45" Margin="0,0,0,5" VerticalContentAlignment="Center"/>
+                <Button Name="btnUrlHistory" Content="▾ Historial" Background="Transparent" Foreground="$ColorPrimary" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right" Margin="0,0,0,20">
+                    <Button.ContextMenu>
+                        <ContextMenu x:Name="ctxUrlHistory" Placement="Bottom" PlacementTarget="{Binding RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </Button.ContextMenu>
+                </Button>
+
                 <!-- Formats -->
                 <Label Content="Formato de VIDEO"/>
                 <ComboBox Name="cmbVideoFmt" Margin="0,0,0,15"/>
@@ -160,7 +167,7 @@ $ColorSubText     = "#86868B"
 
                 <!-- Preview Image -->
                 <Label Content="Vista previa"/>
-                <Border CornerRadius="12" Background="#E5E5EA" Height="170" Margin="0,0,0,20">
+                <Border CornerRadius="12" Background="#E5E5EA" Height="140" Margin="0,0,0,5">
                     <Border.Effect>
                         <DropShadowEffect Color="Black" Opacity="0.1" BlurRadius="10" ShadowDepth="2" Direction="270"/>
                     </Border.Effect>
@@ -171,6 +178,9 @@ $ColorSubText     = "#86868B"
                         </Border>
                     </Grid>
                 </Border>
+
+                <!-- Video Info Label -->
+                <TextBlock Name="lblVideoInfo" Text="" TextAlignment="Center" Foreground="$ColorSubText" FontSize="11" Margin="0,0,0,15" TextWrapping="Wrap"/>
 
                 <!-- Status Console -->
                 <Border Background="#E5E5EA" CornerRadius="8" Padding="15">
@@ -213,7 +223,6 @@ $ColorSubText     = "#86868B"
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $formPrincipal = [System.Windows.Markup.XamlReader]::Load($reader)
 
-# ─── Conectar Variables Globales ──────────────────────────────────────────────
 $TitleBar = $formPrincipal.FindName("TitleBar")
 $btnPickCookies = $formPrincipal.FindName("btnPickCookies")
 $btnInfo = $formPrincipal.FindName("btnInfo")
@@ -226,11 +235,12 @@ $cmbVideoFmt = $formPrincipal.FindName("cmbVideoFmt")
 $cmbAudioFmt = $formPrincipal.FindName("cmbAudioFmt")
 $btnDescargar = $formPrincipal.FindName("btnDescargar")
 $picPreview = $formPrincipal.FindName("picPreview")
+$lblVideoInfo = $formPrincipal.FindName("lblVideoInfo")
 $lblEstadoConsulta = $formPrincipal.FindName("lblEstadoConsulta")
 $btnExit = $formPrincipal.FindName("btnExit")
 $btnSites = $formPrincipal.FindName("btnSites")
 
-# ─── Eventos de Interfaz Base ──────────────────────────────────────────────────
+# Eventos Base
 $TitleBar.Add_MouseLeftButtonDown({
     $formPrincipal.DragMove()
 })
@@ -284,10 +294,6 @@ $picPreview.Add_MouseLeftButtonDown({
     }
 })
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  LÓGICA GUI (Funciones de estado)
-# ═══════════════════════════════════════════════════════════════════════════════
-
 function Set-DownloadButtonVisual {
     $haveYt   = Test-CommandExists -Name "yt-dlp"
     $haveFfm  = Test-CommandExists -Name "ffmpeg"
@@ -310,12 +316,12 @@ function Set-DownloadButtonVisual {
     
     if (-not $isConsulted) {
         $btnDescargar.Content = "Buscar Video"
-        $btnDescargar.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 122, 255))) # Apple Blue
+        $btnDescargar.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 122, 255)))
         $btnDescargar.ToolTip = "Aún no consultado: al hacer clic validará la URL"
     } elseif (-not $script:formatsEnumerated) {
         $btnDescargar.Content = "Buscar Video"
         $btnDescargar.IsEnabled = $true
-        $btnDescargar.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255, 149, 0))) # Orange
+        $btnDescargar.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255, 149, 0)))
         $btnDescargar.ToolTip = "No se pudieron extraer formatos. Presiona 'Buscar Video' para reintentar."
         if ($lblEstadoConsulta) {
             $lblEstadoConsulta.Text = "No fue posible extraer formatos. Presiona 'Buscar Video' para volver a consultar."
@@ -323,7 +329,7 @@ function Set-DownloadButtonVisual {
         }
     } else {
         $btnDescargar.Content = "Descargar Video"
-        $btnDescargar.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 199, 89))) # Green
+        $btnDescargar.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 199, 89)))
         $btnDescargar.ToolTip = "Consulta válida: listo para descargar"
     }
 }
@@ -372,6 +378,20 @@ function Show-PreviewUniversal {
     $lblEstadoConsulta.Text = "Obteniendo miniaturas..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Blue
     
+    if ($global:videoJsonData) {
+        $title = $global:videoJsonData.title
+        $uploader = $global:videoJsonData.uploader
+        $duration = $global:videoJsonData.duration_string
+        if ($title) {
+            $info = "$title"
+            if ($uploader) { $info += " • $uploader" }
+            if ($duration) { $info += " • $duration" }
+            $lblVideoInfo.Text = $info
+        }
+    } else {
+        $lblVideoInfo.Text = ""
+    }
+
     $thumbFile = Fetch-ThumbnailFile -Url $Url
     if ($thumbFile -and (Test-Path $thumbFile)) {
         try {
@@ -416,7 +436,6 @@ function Show-PreviewUniversal {
 
 function Show-UrlHistoryMenu {
     $ctxUrlHistory.Items.Clear()
-    
     $items = @()
     try {
         if (Test-Path -LiteralPath $script:LogFile) {
@@ -437,7 +456,6 @@ function Show-UrlHistoryMenu {
         for ($i = 0; $i -lt $top; $i++) {
             $displayText = [string]$items[$i]
             if ([string]::IsNullOrWhiteSpace($displayText)) { continue }
-            
             $urlItem = New-Object System.Windows.Controls.MenuItem
             $urlItem.Header = $displayText
             $urlItem.ToolTip = $displayText
@@ -450,9 +468,7 @@ function Show-UrlHistoryMenu {
             })
             [void]$ctxUrlHistory.Items.Add($urlItem)
         }
-        
         [void]$ctxUrlHistory.Items.Add((New-Object System.Windows.Controls.Separator))
-        
         $miClear = New-Object System.Windows.Controls.MenuItem
         $miClear.Header = "Borrar historial"
         $miClear.Foreground = [System.Windows.Media.Brushes]::Crimson
@@ -462,21 +478,16 @@ function Show-UrlHistoryMenu {
         })
         [void]$ctxUrlHistory.Items.Add($miClear)
     }
-    
     $ctxUrlHistory.IsOpen = $true
 }
 
 $btnUrlHistory.Add_Click({ Show-UrlHistoryMenu })
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  VENTANAS SECUNDARIAS
-# ═══════════════════════════════════════════════════════════════════════════════
-
 function Show-AppInfo {
     [xml]$xamlInfo = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Información de la Aplicación" Height="550" Width="600"
+        Title="Información de la Aplicación" Height="620" Width="760"
         WindowStartupLocation="CenterOwner" Background="#F5F5F7" ResizeMode="NoResize">
     <Window.Resources>
         <Style TargetType="TextBlock">
@@ -521,6 +532,10 @@ function Show-AppInfo {
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="LinkText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#007AFF"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
     </Window.Resources>
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -534,55 +549,91 @@ function Show-AppInfo {
         
         <CheckBox Name="chkDebug" Grid.Row="1" Content="Mostrar debug en consola" Margin="0,0,0,20"/>
         
-        <Border Grid.Row="2" Background="White" CornerRadius="10" Padding="10">
+        <Border Grid.Row="2" Background="White" CornerRadius="10" Padding="15">
             <Border.Effect>
                 <DropShadowEffect Color="Black" Opacity="0.05" BlurRadius="10" ShadowDepth="2"/>
             </Border.Effect>
             <StackPanel>
-                <TextBlock Text="Dependencias detectadas" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                <TextBlock Text="Dependencias y herramientas necesarias" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,15"/>
                 
-                <Grid Margin="0,5">
+                <!-- yt-dlp -->
+                <Grid Margin="0,5,0,15">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Name="lblYtDlp" Grid.Column="0" Text="yt-dlp: verificando..." VerticalAlignment="Center"/>
-                    <Button Name="btnYtRefresh" Grid.Column="1" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0"/>
-                    <Button Name="btnYtUninstall" Grid.Column="2" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30"/>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="yt-dlp" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock Name="lnkYtDlp" Text="Ir a GitHub" Style="{StaticResource LinkText}" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Motor principal de descarga de videos." FontSize="12" Foreground="#86868B" TextWrapping="Wrap"/>
+                        <TextBlock Name="lblYtDlp" Text="Verificando..." FontSize="12" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Name="btnYtRefresh" Grid.Column="2" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <Button Name="btnYtUninstall" Grid.Column="3" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30" VerticalAlignment="Center"/>
                 </Grid>
                 
-                <Grid Margin="0,5">
+                <!-- ffmpeg -->
+                <Grid Margin="0,5,0,15">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Name="lblFfmpeg" Grid.Column="0" Text="ffmpeg: verificando..." VerticalAlignment="Center"/>
-                    <Button Name="btnFfmpegRefresh" Grid.Column="1" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0"/>
-                    <Button Name="btnFfmpegUninstall" Grid.Column="2" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30"/>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="ffmpeg" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock Name="lnkFfmpeg" Text="Ir a Página Oficial" Style="{StaticResource LinkText}" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Herramienta para procesar y unir audio y video." FontSize="12" Foreground="#86868B" TextWrapping="Wrap"/>
+                        <TextBlock Name="lblFfmpeg" Text="Verificando..." FontSize="12" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Name="btnFfmpegRefresh" Grid.Column="2" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <Button Name="btnFfmpegUninstall" Grid.Column="3" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30" VerticalAlignment="Center"/>
                 </Grid>
                 
-                <Grid Margin="0,5">
+                <!-- Node.js -->
+                <Grid Margin="0,5,0,15">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Name="lblNode" Grid.Column="0" Text="Node.js: verificando..." VerticalAlignment="Center"/>
-                    <Button Name="btnNodeRefresh" Grid.Column="1" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0"/>
-                    <Button Name="btnNodeUninstall" Grid.Column="2" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30"/>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Node.js" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock Name="lnkNode" Text="Ir a Página Oficial" Style="{StaticResource LinkText}" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Requerido por yt-dlp para extracción en ciertos sitios web." FontSize="12" Foreground="#86868B" TextWrapping="Wrap"/>
+                        <TextBlock Name="lblNode" Text="Verificando..." FontSize="12" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Name="btnNodeRefresh" Grid.Column="2" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <Button Name="btnNodeUninstall" Grid.Column="3" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30" VerticalAlignment="Center"/>
                 </Grid>
                 
-                <Grid Margin="0,5">
+                <!-- mpv.net -->
+                <Grid Margin="0,5,0,5">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Name="lblMpvNet" Grid.Column="0" Text="mpv.net: verificando..." VerticalAlignment="Center"/>
-                    <Button Name="btnMpvNetRefresh" Grid.Column="1" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0"/>
-                    <Button Name="btnMpvNetUninstall" Grid.Column="2" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30"/>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="mpv.net" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock Name="lnkMpv" Text="Ir a GitHub" Style="{StaticResource LinkText}" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Reproductor opcional para la vista previa de videos." FontSize="12" Foreground="#86868B" TextWrapping="Wrap"/>
+                        <TextBlock Name="lblMpvNet" Text="Verificando..." FontSize="12" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Button Name="btnMpvNetRefresh" Grid.Column="2" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <Button Name="btnMpvNetUninstall" Grid.Column="3" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30" VerticalAlignment="Center"/>
                 </Grid>
             </StackPanel>
         </Border>
@@ -625,6 +676,11 @@ function Show-AppInfo {
     }
     Refresh-DependencyLabel -CommandName "mpvnet"  -FriendlyName "mpv.net" -LabelRef ([ref]$lblMpvNet) -VersionArgs "--version" -Parse "FirstLine"
     
+    $winInfo.FindName("lnkYtDlp").add_MouseLeftButtonDown({ Start-Process "https://github.com/yt-dlp/yt-dlp" })
+    $winInfo.FindName("lnkFfmpeg").add_MouseLeftButtonDown({ Start-Process "https://ffmpeg.org/" })
+    $winInfo.FindName("lnkNode").add_MouseLeftButtonDown({ Start-Process "https://nodejs.org/" })
+    $winInfo.FindName("lnkMpv").add_MouseLeftButtonDown({ Start-Process "https://github.com/mpvnet-player/mpv.net" })
+
     $winInfo.FindName("btnYtRefresh").add_Click({ Update-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -CommandName "yt-dlp" -LabelRef ([ref]$lblYtDlp) -VersionArgs "--version" -Parse "FirstLine" })
     $winInfo.FindName("btnYtUninstall").add_Click({ Uninstall-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -LabelRef ([ref]$lblYtDlp) })
     
@@ -783,7 +839,7 @@ function Show-SitesDialog {
     })
     
     $txtFiltro.add_TextChanged({
-        if ($txtFiltro.Foreground.ToString() -ne "#FF000000") { return } # No es black
+        if ($txtFiltro.Foreground.ToString() -ne "#FF000000") { return } 
         Refresh-List $txtFiltro.Text.Trim()
     })
     

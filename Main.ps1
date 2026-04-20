@@ -106,8 +106,9 @@ $script:ultimoTitulo      = $null
 $script:lastThumbUrl      = $null
 $script:formatsEnumerated = $false
 $script:cookiesPath       = $null
+$script:cookiesBrowser    = $null
 $script:ultimaRutaDescarga = Get-IniValue -Section "ruta" -Key "Destino" -DefaultValue ([Environment]::GetFolderPath('Desktop'))
-$global:UrlPlaceholder     = "Escribe la URL del video"
+$global:UrlPlaceholder    = "BUSCAR VIDEO"
 
 # ── Variables de proceso de yt-dlp ────────────────────────────────────────────
 $script:lastYtDlpExitCode = $null
@@ -154,12 +155,25 @@ Write-Host "=============================================" -ForegroundColor Dark
 
 # ── Cookies ───────────────────────────────────────────────────────────────────
 $btnPickCookies.Add_Click({
+    $ctxCookies = $formPrincipal.FindName("ctxCookies")
+    $ctxCookies.IsOpen = $true
+})
+
+$formPrincipal.FindName("miCookieEdge").add_Click({ $script:cookiesBrowser = "edge"; $script:cookiesPath = $null; [System.Windows.MessageBox]::Show("Cookies: Navegador Edge seleccionado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
+$formPrincipal.FindName("miCookieChrome").add_Click({ $script:cookiesBrowser = "chrome"; $script:cookiesPath = $null; [System.Windows.MessageBox]::Show("Cookies: Navegador Chrome seleccionado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
+$formPrincipal.FindName("miCookieFirefox").add_Click({ $script:cookiesBrowser = "firefox"; $script:cookiesPath = $null; [System.Windows.MessageBox]::Show("Cookies: Navegador Firefox seleccionado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
+$formPrincipal.FindName("miCookieBrave").add_Click({ $script:cookiesBrowser = "brave"; $script:cookiesPath = $null; [System.Windows.MessageBox]::Show("Cookies: Navegador Brave seleccionado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
+$formPrincipal.FindName("miCookieOpera").add_Click({ $script:cookiesBrowser = "opera"; $script:cookiesPath = $null; [System.Windows.MessageBox]::Show("Cookies: Navegador Opera seleccionado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
+$formPrincipal.FindName("miCookieVivaldi").add_Click({ $script:cookiesBrowser = "vivaldi"; $script:cookiesPath = $null; [System.Windows.MessageBox]::Show("Cookies: Navegador Vivaldi seleccionado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
+
+$formPrincipal.FindName("miCookieFile").add_Click({
     $ofd = New-Object System.Windows.Forms.OpenFileDialog
     $ofd.Title  = "Selecciona cookies.txt"
     $ofd.Filter = "Cookies (*.txt)|*.txt|Todos (*.*)|*.*"
     if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
         $script:cookiesPath = $ofd.FileName
-        [System.Windows.MessageBox]::Show("Cookies configuradas: $($script:cookiesPath)", "OK", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+        $script:cookiesBrowser = $null
+        [System.Windows.MessageBox]::Show("Cookies configuradas archivo: $($script:cookiesPath)", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
     }
 })
 
@@ -289,7 +303,8 @@ $btnDescargar.Add_Click({
         "--no-part","--ignore-config"
     )
     $dlpArgs += $noPlaylistArg   # doble por seguridad
-    if ($script:cookiesPath) { $dlpArgs += @("--cookies",$script:cookiesPath) }
+    if ($script:cookiesBrowser) { $dlpArgs += @("--cookies-from-browser", $script:cookiesBrowser) }
+    elseif ($script:cookiesPath) { $dlpArgs += @("--cookies",$script:cookiesPath) }
     $dlpArgs += $script:ultimaURL
     $dlpArgs += @("--retries","5","--retry-sleep","2","-N","4")
 

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     YTDLL — Módulo de Funciones
     Lógica de negocio: configuración, historial, formatos de video/audio,
@@ -605,7 +605,8 @@ function Get-BestStreamUrl {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return $null }
     $args = @("-g","-f","best",$Url)
-    if ($script:cookiesPath) { $args += @("--cookies",$script:cookiesPath) }
+    if ($script:cookiesBrowser) { $args += @("--cookies-from-browser", $script:cookiesBrowser) }
+    elseif ($script:cookiesPath) { $args += @("--cookies",$script:cookiesPath) }
     $res = Invoke-Capture -ExePath $yt.Source -Args $args
     if ($res.ExitCode -ne 0) { return $null }
     return (($res.StdOut -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)).Trim()
@@ -668,7 +669,8 @@ function Fetch-ThumbnailFile {
     $outTmpl = Join-Path $script:ThumbnailsDir "ytdll_thumb_%(id)s.%(ext)s"
     $args = @("--skip-download","--quiet","--no-warnings","--write-thumbnail","--convert-thumbnails","jpg","-o",$outTmpl,"--no-playlist")
     if ($Url -match 'youtube\.com.*list=') { $args += "--playlist-items","1" }
-    if ($script:cookiesPath)              { $args += @("--cookies",$script:cookiesPath) }
+    if ($script:cookiesBrowser)           { $args += @("--cookies-from-browser", $script:cookiesBrowser) }
+    elseif ($script:cookiesPath)          { $args += @("--cookies",$script:cookiesPath) }
     $args += $Url
     $res = Invoke-Capture -ExePath $yt.Source -Args $args
     $thumb = Get-ChildItem -Path (Join-Path $script:ThumbnailsDir "ytdll_thumb_*") -ErrorAction SilentlyContinue |
