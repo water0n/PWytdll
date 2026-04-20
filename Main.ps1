@@ -159,7 +159,7 @@ $btnPickCookies.Add_Click({
     $ofd.Filter = "Cookies (*.txt)|*.txt|Todos (*.*)|*.*"
     if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
         $script:cookiesPath = $ofd.FileName
-        [System.Windows.Forms.MessageBox]::Show("Cookies configuradas: $($script:cookiesPath)","OK") | Out-Null
+        [System.Windows.MessageBox]::Show("Cookies configuradas: $($script:cookiesPath)", "OK", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
     }
 })
 
@@ -187,7 +187,6 @@ $btnInfo.Add_Click({ Show-AppInfo })
 # ── Salir ─────────────────────────────────────────────────────────────────────
 $btnExit.Add_Click({
     Write-Host "[EXIT] Cerrando aplicación por solicitud del usuario." -ForegroundColor Yellow
-    $formPrincipal.Dispose()
     $formPrincipal.Close()
 })
 
@@ -207,26 +206,23 @@ $btnDescargar.Add_Click({
     if (-not $ready) {
         if ([string]::IsNullOrWhiteSpace($currentUrl)) {
             $lblEstadoConsulta.Text     = "ERROR: Escribe una URL"
-            $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::Red
-            [System.Windows.Forms.MessageBox]::Show("Escribe una URL de YouTube.","Falta URL",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
+            [System.Windows.MessageBox]::Show("Escribe una URL de YouTube.", "Falta URL", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
             Invoke-ConsultaFromUI -Url $currentUrl
             return
         }
         $lblEstadoConsulta.Text     = "Iniciando consulta..."
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkBlue
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
         $ok = Invoke-ConsultaFromUI -Url $currentUrl
         if ($ok) {
             Set-DownloadButtonVisual
-            [System.Windows.Forms.MessageBox]::Show(
-                "Consulta lista. Revisa formatos y vuelve a presionar Descargar para iniciar la descarga.",
-                "Consulta completada",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information
-            ) | Out-Null
+            [System.Windows.MessageBox]::Show("Consulta lista. Revisa formatos y vuelve a presionar Descargar para iniciar la descarga.", "Consulta completada", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
         } else { Set-DownloadButtonVisual }
         return
     }
 
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch {
-        [System.Windows.Forms.MessageBox]::Show("yt-dlp no está disponible. Valídalo en Dependencias.","yt-dlp no encontrado",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        [System.Windows.MessageBox]::Show("yt-dlp no está disponible. Valídalo en Dependencias.", "yt-dlp no encontrado", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
         return
     }
 
@@ -238,7 +234,7 @@ $btnDescargar.Add_Click({
     }
     if (-not (Test-Path -LiteralPath $dest)) {
         try { New-Item -ItemType Directory -Path $dest -Force | Out-Null } catch {
-            [System.Windows.Forms.MessageBox]::Show("No se pudo preparar la carpeta de destino.","Error de destino",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+            [System.Windows.MessageBox]::Show("No se pudo preparar la carpeta de destino.", "Error de destino", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
             return
         }
     }
@@ -263,8 +259,8 @@ $btnDescargar.Add_Click({
     Write-DebugLog "[DEBUG] Selector: $fSelector | MergeExt: $mergeExt" -ForegroundColor Yellow
 
     # ── Nombre del archivo ─────────────────────────────────────────────────────
-    $prevPickDest = $btnPickDestino.Enabled; $prevCmbVid = $cmbVideoFmt.Enabled; $prevCmbAud = $cmbAudioFmt.Enabled
-    $btnPickDestino.Enabled = $false; $cmbVideoFmt.Enabled = $false; $cmbAudioFmt.Enabled = $false
+    $prevPickDest = $btnPickDestino.IsEnabled; $prevCmbVid = $cmbVideoFmt.IsEnabled; $prevCmbAud = $cmbAudioFmt.IsEnabled
+    $btnPickDestino.IsEnabled = $false; $cmbVideoFmt.IsEnabled = $false; $cmbAudioFmt.IsEnabled = $false
     $lblEstadoConsulta.Text = "Preparando descarga…"
 
     $baseTitle = if ($script:ultimoTitulo) { $script:ultimoTitulo } else {
@@ -298,8 +294,7 @@ $btnDescargar.Add_Click({
     $dlpArgs += @("--retries","5","--retry-sleep","2","-N","4")
 
     # ── Ejecutar descarga ──────────────────────────────────────────────────────
-    $oldCursor = [System.Windows.Forms.Cursor]::Current
-    [System.Windows.Forms.Cursor]::Current = [System.Windows.Forms.Cursors]::WaitCursor
+    [System.Windows.Input.Mouse]::OverrideCursor = [System.Windows.Input.Cursors]::Wait
     try {
         $exit = Invoke-YtDlpConsoleProgress -ExePath $yt.Source -Args $dlpArgs -UpdateUi
         if ($exit -ne 0 -and $videoSel -match '^best(video)?$' -and $script:bestProgId) {
@@ -323,23 +318,17 @@ $btnDescargar.Add_Click({
             }
             Add-HistoryUrl -Url $script:ultimaURL
             $lblEstadoConsulta.Text = ("Completado: {0}" -f $script:ultimoTitulo)
-            [System.Windows.Forms.MessageBox]::Show(
-                ("Descarga finalizada:`n{0}" -f $script:ultimoTitulo),
-                "Completado",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Information
-            ) | Out-Null
+            [System.Windows.MessageBox]::Show(("Descarga finalizada:`n{0}" -f $script:ultimoTitulo), "Completado", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
         } else {
             $lblEstadoConsulta.Text = "Error durante la descarga"
-            [System.Windows.Forms.MessageBox]::Show(
-                "Falló la descarga. Revisa conexión/URL/DRM.",
-                "Error de descarga",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error
-            ) | Out-Null
+            [System.Windows.MessageBox]::Show("Falló la descarga. Revisa conexión/URL/DRM.", "Error de descarga", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
             Write-Host "[ERROR] Descarga fallida. ExitCode=$exit" -ForegroundColor Red
         }
     } finally {
-        [System.Windows.Forms.Cursor]::Current = $oldCursor
-        $btnPickDestino.Enabled = $prevPickDest
-        $cmbVideoFmt.Enabled    = $prevCmbVid
-        $cmbAudioFmt.Enabled    = $prevCmbAud
+        [System.Windows.Input.Mouse]::OverrideCursor = $null
+        $btnPickDestino.IsEnabled = $prevPickDest
+        $cmbVideoFmt.IsEnabled    = $prevCmbVid
+        $cmbAudioFmt.IsEnabled    = $prevCmbAud
         Set-DownloadButtonVisual
     }
 })
@@ -354,5 +343,4 @@ try { $txtDestino.Text = $script:ultimaRutaDescarga } catch {}
 # ═══════════════════════════════════════════════════════════════════════════════
 #  MOSTRAR LA APLICACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
-$formPrincipal.Refresh()
-[System.Windows.Forms.Application]::Run($formPrincipal)
+$formPrincipal.ShowDialog() | Out-Null

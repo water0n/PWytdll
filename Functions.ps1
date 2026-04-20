@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     YTDLL — Módulo de Funciones
     Lógica de negocio: configuración, historial, formatos de video/audio,
@@ -153,7 +153,7 @@ function Add-HistoryUrl {
 
     $historyEntry = "{0} | {1}" -f $title, $cleanUrl
     Start-Sleep -Milliseconds 50
-    [System.Windows.Forms.Application]::DoEvents()
+    try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
 
     $currentEntries = @()
     try {
@@ -366,7 +366,7 @@ function Invoke-CaptureResponsive {
         [int]$TimeoutSec      = 120
     )
     $prevBtnState = $null
-    if ($btnConsultar)       { $prevBtnState = $btnConsultar.Enabled; $btnConsultar.Enabled = $false }
+    if ($btnConsultar)       { $prevBtnState = $btnConsultar.Enabled; $btnConsultar.IsEnabled = $false }
     if ($lblEstadoConsulta)  { $lblEstadoConsulta.Text = $WorkingText }
 
     $tmpDir  = [System.IO.Path]::GetTempPath()
@@ -381,7 +381,7 @@ function Invoke-CaptureResponsive {
     $dot = 0
     try {
         while (-not $proc.HasExited) {
-            [System.Windows.Forms.Application]::DoEvents()
+            try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
             $dot = ($dot + 1) % 4
             if ($lblEstadoConsulta) { $lblEstadoConsulta.Text = $WorkingText + ("." * $dot) }
             if ($sw.Elapsed.TotalSeconds -ge $TimeoutSec) {
@@ -519,7 +519,7 @@ function Invoke-YtDlpConsoleProgress {
             }
             if ($bufOut) { $bufOut = ([regex]::Split($bufOut, "\r\n|\n|\r") | Select-Object -Last 1) }
             if ($bufErr) { $bufErr = ([regex]::Split($bufErr, "\r\n|\n|\r") | Select-Object -Last 1) }
-            [System.Windows.Forms.Application]::DoEvents()
+            try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
             Start-Sleep -Milliseconds 80
         }
         $bufOut += $srOut.ReadToEnd(); $bufErr += $srErr.ReadToEnd()
@@ -556,7 +556,7 @@ function Get-Metadata {
 }
 
 function Get-SelectedFormatId {
-    param([System.Windows.Forms.ComboBox]$Combo)
+    param([System.Windows.Controls.ComboBox]$Combo)
     if (-not $Combo -or -not $Combo.SelectedItem) { return $null }
     $t = [string]$Combo.SelectedItem
     if ([string]::IsNullOrWhiteSpace($t)) { return $null }
@@ -766,11 +766,11 @@ function Fetch-Formats {
     $script:bestProgRank      = -1
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch {
         $lblEstadoConsulta.Text     = "ERROR: yt-dlp no disponible para listar formatos"
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::Red
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
         return $false
     }
     $lblEstadoConsulta.Text     = "Obteniendo lista de formatos..."
-    $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkBlue
+    $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     $args1 = @("-J","--no-playlist","--ignore-config","--no-warnings",$Url)
     $obj   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Obteniendo formatos" -TimeoutSec 30
     if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
@@ -778,19 +778,19 @@ function Fetch-Formats {
         $obj = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Reintentando formatos" -TimeoutSec 30
         if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
             $lblEstadoConsulta.Text     = "ERROR: No se pudieron obtener formatos"
-            $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::Red
+            $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
             return $false
         }
     }
     try { $json = $obj.StdOut | ConvertFrom-Json } catch {
         $lblEstadoConsulta.Text     = "ERROR: Formato JSON inválido"
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::Red
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
         return $false
     }
     $script:lastThumbUrl = Get-BestThumbnailUrl -Json $json
     if (-not $json.formats -or $json.formats.Count -eq 0) {
         $lblEstadoConsulta.Text     = "ADVERTENCIA: No se encontraron formatos"
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkOrange
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkOrange
         return $false
     }
     $script:lastFormats = $json.formats
@@ -820,11 +820,11 @@ function Fetch-Formats {
     if ($json.extractor) { $script:lastExtractor = $json.extractor }
     if ($script:formatsEnumerated) {
         $lblEstadoConsulta.Text     = "Formatos obtenidos y ordenados correctamente"
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkGreen
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkGreen
         Populate-FormatCombos
     } else {
         $lblEstadoConsulta.Text     = "ADVERTENCIA: No se pudieron enumerar formatos"
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkOrange
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkOrange
     }
     return $script:formatsEnumerated
 }
@@ -864,24 +864,24 @@ function Invoke-ConsultaFromUI {
     $script:isPlaylist   = Test-YouTubePlaylist -Url $Url
     if ($script:isPlaylist) {
         $lblEstadoConsulta.Text     = "Playlist detectada, extrayendo primer video..."
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkOrange
-        [System.Windows.Forms.Application]::DoEvents()
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkOrange
+        try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
         $singleVideoUrl = Extract-VideoFromPlaylist -Url $Url
-        if ($singleVideoUrl) { $Url = $singleVideoUrl; $txtUrl.Text = $singleVideoUrl; $txtUrl.ForeColor = [System.Drawing.Color]::Black }
+        if ($singleVideoUrl) { $Url = $singleVideoUrl; $txtUrl.Text = $singleVideoUrl; $txtUrl.Foreground = [System.Windows.Media.Brushes]::Black }
     }
     Write-Host ("`n`n[CONSULTA] Consultando URL: {0}" -f $Url) -ForegroundColor Cyan
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch {
         $lblEstadoConsulta.Text     = "ERROR: yt-dlp no disponible"
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::Red
-        [System.Windows.Forms.MessageBox]::Show("yt-dlp no está disponible en el PATH.","yt-dlp no encontrado",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
+        [System.Windows.MessageBox]::Show("yt-dlp no está disponible en el PATH.","yt-dlp no encontrado",[System.Windows.MessageBoxButton]::OK,[System.Windows.MessageBoxImage]::Error) | Out-Null
         return $false
     }
-    $btnDescargar.Enabled = $false; $txtUrl.Enabled = $false
+    $btnDescargar.IsEnabled = $false; $txtUrl.IsEnabled = $false
     if ($script:ultimaURL -ne $Url) { $script:videoConsultado = $false; $script:formatsEnumerated = $false }
     $args = @("--no-playlist","--no-warnings","--ignore-config","--print","title","--print","thumbnail","--print","id",$Url)
     $lblEstadoConsulta.Text     = "Consultando video..."
-    $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkBlue
-    [System.Windows.Forms.Application]::DoEvents()
+    $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
+    try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
     $res   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Consultando video" -TimeoutSec 30
     $lines = @()
     if (-not [string]::IsNullOrWhiteSpace($res.StdOut)) {
@@ -897,31 +897,31 @@ function Invoke-ConsultaFromUI {
         $script:lastThumbUrl      = $thumbUrl
         $script:formatsEnumerated = $false
         $lblEstadoConsulta.Text     = "Consulta OK: `"$title`""
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkGreen
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkGreen
         $lblEstadoConsulta.Text     = "Cargando vista previa..."
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkBlue
-        [System.Windows.Forms.Application]::DoEvents()
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
+        try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
         Show-PreviewUniversal -Url $Url -Titulo $title -DirectThumbUrl $thumbUrl
         $lblEstadoConsulta.Text     = "Obteniendo formatos..."
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkBlue
-        [System.Windows.Forms.Application]::DoEvents()
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
+        try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
         $fmtOk = Fetch-Formats -Url $Url
         if ($fmtOk -and $script:lastFormats) { Print-FormatsTable -formats $script:lastFormats }
-        $btnDescargar.Enabled = $true; $txtUrl.Enabled = $true
+        $btnDescargar.IsEnabled = $true; $txtUrl.IsEnabled = $true
         Set-DownloadButtonVisual
         $lblEstadoConsulta.Text     = if ($fmtOk) { "Consulta completada - Listo para descargar" } else { "Consulta completada (sin formatos)" }
-        $lblEstadoConsulta.ForeColor = if ($fmtOk) { [System.Drawing.Color]::DarkGreen } else { [System.Drawing.Color]::DarkOrange }
+        $lblEstadoConsulta.Foreground = if ($fmtOk) { [System.Windows.Media.Brushes]::DarkGreen } else { [System.Windows.Media.Brushes]::DarkOrange }
         return $true
     } else {
         $script:videoConsultado = $false; $script:ultimaURL = $null; $script:ultimoTitulo = $null
         $script:formatsEnumerated = $false
         $lblEstadoConsulta.Text     = "Error al consultar la URL"
-        $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::Red
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
         $picPreview.Image = $null
-        $btnDescargar.Enabled = $true; $txtUrl.Enabled = $true
+        $btnDescargar.IsEnabled = $true; $txtUrl.IsEnabled = $true
         $errorMsg = "yt-dlp devolvió error al consultar la URL."
         if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) { $errorMsg += "`n`nError: $($res.StdErr)" }
-        [System.Windows.Forms.MessageBox]::Show($errorMsg,"Error en consulta",[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        [System.Windows.MessageBox]::Show($errorMsg, "Error en consulta", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
         Set-DownloadButtonVisual
         return $false
     }
