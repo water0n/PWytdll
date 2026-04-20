@@ -17,15 +17,15 @@ if (-not (Test-Path -LiteralPath $script:LogFile)) {
                                                                                                 $version = "beta 251215.1225"
 function Get-IniValue {
     param([string]$Section, [string]$Key, [string]$DefaultValue = $null)
-    
+
     if (-not (Test-Path $script:ConfigFile)) {
         return $DefaultValue
     }
-    
+
     try {
         $content = Get-Content $script:ConfigFile -ErrorAction Stop
         $inSection = $false
-        
+
         foreach ($line in $content) {
             $line = $line.Trim()
             if ($line -eq "[$Section]") {
@@ -35,7 +35,7 @@ function Get-IniValue {
                 $inSection = $false
                 continue
             }
-            
+
             if ($inSection -and $line -match "^$Key=(.*)$") {
                 return $matches[1].Trim()
             }
@@ -43,7 +43,7 @@ function Get-IniValue {
     } catch {
         Write-Host "[CONFIG] Error leyendo configuración: $($_.Exception.Message)" -ForegroundColor Yellow
     }
-    
+
     return $DefaultValue
 }
 function Set-IniValue {
@@ -88,7 +88,7 @@ function Set-IniValue {
 }
 function Write-DebugLog {
     param([string]$Message, [string]$ForegroundColor = "Yellow")
-    
+
     if ($script:DebugEnabled) {
         Write-Host $Message -ForegroundColor $ForegroundColor
     }
@@ -102,7 +102,7 @@ function Get-CleanUrl {
     return $cleanUrl.Trim()
 }
 function Clear-History {
-    try { 
+    try {
         Set-Content -LiteralPath $script:LogFile -Value @() -Encoding UTF8
     } catch {}
 }
@@ -565,15 +565,15 @@ function Fetch-Formats {
     $script:lastFormats = $null
     $script:bestProgId   = $null
     $script:bestProgRank = -1
-    try { 
-        $yt = Get-Command yt-dlp -ErrorAction Stop 
+    try {
+        $yt = Get-Command yt-dlp -ErrorAction Stop
     } catch {
         $lblEstadoConsulta.Text = "ERROR: yt-dlp no disponible para listar formatos"
         $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::Red
         Write-Host "`t[ERROR] yt-dlp no disponible para listar formatos." -ForegroundColor Red
         return $false
     }
-    
+
     $lblEstadoConsulta.Text = "Obteniendo lista de formatos..."
     $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkBlue
     $args1 = @(
@@ -745,12 +745,12 @@ function Populate-FormatCombos {
     foreach ($item in $sortedAudio) {
         $cmbAudioFmt.Items.Add($item.Display) | Out-Null
     }
-    if ($cmbVideoFmt.Items.Count -gt 0) { 
-        $cmbVideoFmt.SelectedIndex = 0 
+    if ($cmbVideoFmt.Items.Count -gt 0) {
+        $cmbVideoFmt.SelectedIndex = 0
         Write-DebugLog "[DEBUG] Video combo items: $($cmbVideoFmt.Items.Count)" -ForegroundColor Yellow
     }
-    if ($cmbAudioFmt.Items.Count -gt 0) { 
-        $cmbAudioFmt.SelectedIndex = 0 
+    if ($cmbAudioFmt.Items.Count -gt 0) {
+        $cmbAudioFmt.SelectedIndex = 0
         Write-DebugLog "[DEBUG] Audio combo items: $($cmbAudioFmt.Items.Count)" -ForegroundColor Yellow
     }
 }
@@ -1125,8 +1125,8 @@ function Get-ThumbnailListFromYtDlp {
         $width  = $m.Groups[2].Value
         $height = $m.Groups[3].Value
         $url    = $m.Groups[4].Value
-        if ($url -match '\.webp($|\?)|vi_webp') { 
-            continue 
+        if ($url -match '\.webp($|\?)|vi_webp') {
+            continue
         }
         if ($url -notmatch '\.jpg($|\?)') {
             continue
@@ -1142,11 +1142,11 @@ function Get-ThumbnailListFromYtDlp {
         }
     }
     Write-Host "`t[THUMB] Encontradas $($thumbs.Count) miniaturas JPG" -ForegroundColor Cyan
-    
+
     if (-not $thumbs -or $thumbs.Count -eq 0) {
         Write-Host "`t[THUMB] No se encontraron miniaturas JPG." -ForegroundColor Yellow
         return @()
-    }   
+    }
     return $thumbs
 }
 function Select-BestThumbnail {
@@ -1175,11 +1175,11 @@ function Select-BestThumbnail {
 }
 function Fetch-ThumbnailFile {
     param([Parameter(Mandatory=$true)][string]$Url)
-    try { 
-        $yt = Get-Command yt-dlp -ErrorAction Stop 
-    } catch { 
+    try {
+        $yt = Get-Command yt-dlp -ErrorAction Stop
+    } catch {
         Write-Host "`t[ERROR] yt-dlp no disponible para descargar miniatura" -ForegroundColor Red
-        return $null 
+        return $null
     }
         if (-not (Test-Path $script:ThumbnailsDir)) {
             New-Item -ItemType Directory -Path $script:ThumbnailsDir -Force | Out-Null
@@ -1198,8 +1198,8 @@ function Fetch-ThumbnailFile {
     if ($Url -match 'youtube\.com.*list=') {
         $args += "--playlist-items", "1"
     }
-    if ($script:cookiesPath) { 
-        $args += @("--cookies", $script:cookiesPath) 
+    if ($script:cookiesPath) {
+        $args += @("--cookies", $script:cookiesPath)
     }
     $args += $Url
     Write-Host "`t[THUMB] Ejecutando yt-dlp para obtener miniatura..." -ForegroundColor Cyan
@@ -1254,7 +1254,7 @@ function Show-PreviewUniversal {
                 Start-Sleep -Seconds 5
                 try { Remove-Item $file -Force -ErrorAction SilentlyContinue } catch {}
             } -ArgumentList $thumbFile | Out-Null
-            
+
             return $true
         } catch {
             Write-Host "`t[VISTA PREVIA] Error al cargar miniatura descargada: $($_.Exception.Message)" -ForegroundColor Red
@@ -1304,22 +1304,22 @@ function Show-PreviewImage {
             Write-Host "`t[VISTA PREVIA] Detectado WEBP, intentando conversión..." -ForegroundColor Yellow
             $png = Convert-WebpUrlToPng -Url $ImageUrl
             if ($png -and (Test-Path $png)) {
-                try { 
-                    if ($picPreview.Image) { $picPreview.Image.Dispose() } 
+                try {
+                    if ($picPreview.Image) { $picPreview.Image.Dispose() }
                 } catch {}
                 $imgW = [System.Drawing.Image]::FromFile($png)
                 $picPreview.Image = $imgW
                 if ($Titulo) { $toolTip.SetToolTip($picPreview, $Titulo) }
                 Start-Sleep -Seconds 2
-                try { Remove-Item $png -Force -ErrorAction SilentlyContinue } catch {}       
+                try { Remove-Item $png -Force -ErrorAction SilentlyContinue } catch {}
                 return $true
             }
             return $false
         }
         $img = Get-ImageFromUrl -Url $ImageUrl
         if ($img) {
-            try { 
-                if ($picPreview.Image) { $picPreview.Image.Dispose() } 
+            try {
+                if ($picPreview.Image) { $picPreview.Image.Dispose() }
             } catch {}
             $picPreview.Image = $img
             if ($Titulo) { $toolTip.SetToolTip($picPreview, $Titulo) }
@@ -1336,7 +1336,7 @@ function Get-ImageFromUrlFallback {
     try {
         Write-Host `t"[IMAGE-FALLBACK] Intentando con Invoke-WebRequest: $Url" -ForegroundColor Cyan
         $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 10
-        $bytes = $response.Content       
+        $bytes = $response.Content
         if ($bytes -and $bytes.Length -gt 0) {
             Write-Host "`t[IMAGE-FALLBACK] Descargados $($bytes.Length) bytes" -ForegroundColor Green
             $ms = New-Object System.IO.MemoryStream(,$bytes)
@@ -1408,7 +1408,7 @@ function Invoke-ConsultaFromUI {
         $lblEstadoConsulta.Text = "Playlist detectada, extrayendo primer video..."
         $lblEstadoConsulta.ForeColor = [System.Drawing.Color]::DarkOrange
         [System.Windows.Forms.Application]::DoEvents()
-        
+
         $singleVideoUrl = Extract-VideoFromPlaylist -Url $Url
         if ($singleVideoUrl) {
             Write-Host "[CONSULTA] Usando video individual para previsualización: $singleVideoUrl" -ForegroundColor Green
@@ -1448,10 +1448,10 @@ function Invoke-ConsultaFromUI {
     }
     $args = @(
         "--no-playlist",
-        "--no-warnings", 
+        "--no-warnings",
         "--ignore-config",
         "--print", "title",
-        "--print", "thumbnail", 
+        "--print", "thumbnail",
         "--print", "id",
         $Url
     )
@@ -1528,7 +1528,7 @@ function Invoke-ConsultaFromUI {
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error
         ) | Out-Null
-        
+
         Write-Host "`t[ERROR] No se pudo consultar el video. ExitCode: $($res.ExitCode)" -ForegroundColor Red
         if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) {
             Write-Host "`t[ERROR] StdErr: $($res.StdErr)" -ForegroundColor Red
@@ -1888,7 +1888,7 @@ function Get-DisplayUrl {
     return $u
 }
 $mpvnetInstalled = Test-CommandExists -Name "mpvnet"
-if ($mpvnetInstalled) {     $mpvnetVersion = Get-ToolVersion -Command "mpvnet" -ArgsForVersion "--version" -Parse "FirstLine" } 
+if ($mpvnetInstalled) {     $mpvnetVersion = Get-ToolVersion -Command "mpvnet" -ArgsForVersion "--version" -Parse "FirstLine" }
 function Initialize-AppHeadless {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
@@ -1914,15 +1914,15 @@ function Initialize-AppHeadless {
         Write-Host "[EXIT] Falta Chocolatey o se requiere reinicio." -ForegroundColor Yellow
         return $false
     }
-    if (-not (Ensure-ToolHeadless -CommandName "yt-dlp" -FriendlyName "yt-dlp" -ChocoPkg "yt-dlp" -VersionArgs "--version")) { 
-        return $false 
+    if (-not (Ensure-ToolHeadless -CommandName "yt-dlp" -FriendlyName "yt-dlp" -ChocoPkg "yt-dlp" -VersionArgs "--version")) {
+        return $false
     }
-    if (-not (Ensure-ToolHeadless -CommandName "ffmpeg" -FriendlyName "ffmpeg" -ChocoPkg "ffmpeg" -VersionArgs "-version")) { 
-        return $false 
+    if (-not (Ensure-ToolHeadless -CommandName "ffmpeg" -FriendlyName "ffmpeg" -ChocoPkg "ffmpeg" -VersionArgs "-version")) {
+        return $false
     }
     if ($script:RequireNode) {
-        if (-not (Ensure-ToolHeadless -CommandName "node" -FriendlyName "Node.js" -ChocoPkg "nodejs-lts" -VersionArgs "--version")) { 
-            return $false 
+        if (-not (Ensure-ToolHeadless -CommandName "node" -FriendlyName "Node.js" -ChocoPkg "nodejs-lts" -VersionArgs "--version")) {
+            return $false
         }
     }
     Write-Host "[CHECK] (headless) Verificando mpvnet: " -NoNewline
@@ -2120,12 +2120,12 @@ function Show-AppInfo {
         }
 
         $list = @()
-        if ($ytVer) { 
+        if ($ytVer) {
             $list += "yt-dlp: $ytVer"
         } else {
             $list += "yt-dlp: no instalado"
         }
-        if ($ffVer) { 
+        if ($ffVer) {
             $list += "ffmpeg: $ffVer"
         } else {
             $list += "ffmpeg: no instalado"
@@ -2322,7 +2322,7 @@ $formPrincipal.Controls.Add($btnUrlHistory)
         } else {
             $toolTip.SetToolTip($txtUrl, "")
         }
-    
+
         Set-DownloadButtonVisual
     })
     $txtUrl.Add_LostFocus({
@@ -2367,7 +2367,7 @@ $picPreview = New-Object System.Windows.Forms.PictureBox
             ) | Out-Null
             return
         }
-    
+
         $cmd = $null
         try {
             $cmd = Get-Command "mpvnet" -ErrorAction Stop
@@ -2380,7 +2380,7 @@ $picPreview = New-Object System.Windows.Forms.PictureBox
             ) | Out-Null
             return
         }
-    
+
         $playUrl = $null
         try {
             Write-Host "[PREVIEW-PLAY] Obteniendo stream con yt-dlp..." -ForegroundColor Cyan
@@ -2391,11 +2391,11 @@ $picPreview = New-Object System.Windows.Forms.PictureBox
         } catch {
             $playUrl = $null
         }
-    
+
         if (-not $playUrl) {
             $playUrl = $script:ultimaURL
         }
-    
+
         try {
             Start-Process -FilePath $cmd.Source -ArgumentList @(
                 $playUrl,
@@ -2448,29 +2448,29 @@ function Show-UrlHistoryMenu {
             $content = [System.IO.File]::ReadAllText($script:LogFile, [System.Text.Encoding]::UTF8)
             Write-DebugLog "[DEBUG] Contenido completo del archivo: '$content'" -ForegroundColor Magenta
             $items = @(
-                $content -split "`r?`n" | 
-                    ForEach-Object { 
+                $content -split "`r?`n" |
+                    ForEach-Object {
                         $line = $_.Trim()
                         Write-DebugLog "[DEBUG] Procesando línea: '$line'" -ForegroundColor Gray
                         $line
-                    } | 
-                    Where-Object { 
+                    } |
+                    Where-Object {
                         $isValid = $_ -and ($_ -notmatch '^\s*$')
                         Write-DebugLog "[DEBUG] Línea válida? '$isValid' para: '$_'" -ForegroundColor Gray
                         $isValid
-                    } | 
+                    } |
                     Select-Object -Unique
             )
         } else {
             $items = @()
         }
-    } catch { 
+    } catch {
         Write-DebugLog "[DEBUG] Error al leer historial: $($_.Exception.Message)" -ForegroundColor Red
         try {
             $items = @(
-                Get-Content -LiteralPath $script:LogFile -ErrorAction Stop | 
-                    ForEach-Object { $_.Trim() } | 
-                    Where-Object { $_ -and ($_ -notmatch '^\s*$') } | 
+                Get-Content -LiteralPath $script:LogFile -ErrorAction Stop |
+                    ForEach-Object { $_.Trim() } |
+                    Where-Object { $_ -and ($_ -notmatch '^\s*$') } |
                     Select-Object -Unique
             )
         } catch {
@@ -2482,7 +2482,7 @@ function Show-UrlHistoryMenu {
         Write-DebugLog "[DEBUG] Primer item completo: '$($items[0])'" -ForegroundColor Yellow
         Write-DebugLog "[DEBUG] Longitud del primer item: $($items[0].Length)" -ForegroundColor Yellow
     }
-    
+
     if (-not $items -or $items.Count -eq 0) {
         $miEmpty = New-Object System.Windows.Forms.ToolStripMenuItem
         $miEmpty.Text = "(Sin historial)"
@@ -2491,54 +2491,54 @@ function Show-UrlHistoryMenu {
     } else {
         $top = [Math]::Min(12, $items.Count)
         Write-DebugLog "[DEBUG] Mostrando $top items" -ForegroundColor Yellow
-        
+
         for ($i = 0; $i -lt $top; $i++) {
             $displayText = [string]$items[$i]
             if ([string]::IsNullOrWhiteSpace($displayText)) {
                 Write-DebugLog "[DEBUG] Item $i está vacío, saltando" -ForegroundColor Red
                 continue
             }
-            
+
             Write-DebugLog "[DEBUG] Procesando item $i : '$displayText'" -ForegroundColor Cyan
             Write-DebugLog "[DEBUG] Longitud del item $i : $($displayText.Length)" -ForegroundColor Cyan
-            
+
             $urlItem = New-Object System.Windows.Forms.ToolStripMenuItem
             $urlItem.Text = $displayText
             $urlItem.ToolTipText = $displayText
-            
+
             $urlItem.add_Click({
                 param($sender, $e)
                 $fullText = [string]($sender -as [System.Windows.Forms.ToolStripMenuItem]).Text
                 Write-DebugLog "[DEBUG] Click en: '$fullText'" -ForegroundColor Green
-                
+
                 if ($fullText -match '\|\s*(.+)$') {
                     $urlToSet = $matches[1].Trim()
                 } else {
                     $urlToSet = $fullText
                 }
-                
+
                 Write-DebugLog "[DEBUG] URL a establecer: '$urlToSet'" -ForegroundColor Cyan
                 $txtUrl.Text = $urlToSet
                 $txtUrl.ForeColor = [System.Drawing.Color]::Black
                 $txtUrl.SelectionStart = $txtUrl.Text.Length
                 $txtUrl.SelectionLength = 0
             })
-            
+
             [void]$ctxUrlHistory.Items.Add($urlItem)
             Write-DebugLog "[DEBUG] Item agregado al menú: '$displayText'" -ForegroundColor Green
         }
     }
-    
+
     if ($ctxUrlHistory.Items.Count -gt 0) {
         [void]$ctxUrlHistory.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
-        
+
         $miClear = New-Object System.Windows.Forms.ToolStripMenuItem
         $miClear.Text = "Borrar historial"
         $miClear.ForeColor = [System.Drawing.Color]::Crimson
         $miClear.add_Click({
             $r = [System.Windows.Forms.MessageBox]::Show(
                 "¿Seguro que deseas borrar el historial de URLs?",
-                "Confirmar", 
+                "Confirmar",
                 [System.Windows.Forms.MessageBoxButtons]::YesNo,
                 [System.Windows.Forms.MessageBoxIcon]::Question
             )
@@ -2548,7 +2548,7 @@ function Show-UrlHistoryMenu {
         })
         [void]$ctxUrlHistory.Items.Add($miClear)
     }
-    
+
     $pt = New-Object System.Drawing.Point(0, $AnchorControl.Height)
     $ctxUrlHistory.Show($AnchorControl, $pt)
 }
@@ -2556,52 +2556,52 @@ function Add-HistoryUrl {
     param([Parameter(Mandatory=$true)][string]$Url)
     Write-DebugLog "[DEBUG] Add-HistoryUrl iniciada con URL: '$Url'" -ForegroundColor Cyan
     Write-DebugLog "[DEBUG] script:ultimoTitulo: '$($script:ultimoTitulo)'" -ForegroundColor Cyan
-    
+
     $u = $Url.Trim()
-    if ([string]::IsNullOrWhiteSpace($u)) { 
+    if ([string]::IsNullOrWhiteSpace($u)) {
         Write-DebugLog "[DEBUG] URL vacía, saliendo" -ForegroundColor Yellow
-        return 
+        return
     }
-    if ($u -eq $global:UrlPlaceholder) { 
+    if ($u -eq $global:UrlPlaceholder) {
         Write-DebugLog "[DEBUG] URL es placeholder, saliendo" -ForegroundColor Yellow
-        return 
+        return
     }
-    if ($u -notmatch '^(\w+://|www\.|\w+\.\w+)') { 
+    if ($u -notmatch '^(\w+://|www\.|\w+\.\w+)') {
         Write-DebugLog "[DEBUG] URL no válida: '$u'" -ForegroundColor Yellow
-        return 
+        return
     }
-    
+
     $cleanUrl = Get-CleanUrl -Url $u
     Write-DebugLog "[DEBUG] URL limpia: '$cleanUrl'" -ForegroundColor Cyan
-    
-    $title = if ($script:ultimoTitulo) { 
+
+    $title = if ($script:ultimoTitulo) {
         $safeTitle = Get-SafeFileName -Name $script:ultimoTitulo
         if ($safeTitle.Length -gt 20) {
             $safeTitle.Substring(0, 20) + "..."
         } else {
             $safeTitle
         }
-    } else { 
-        "Video" 
+    } else {
+        "Video"
     }
-    
+
     $historyEntry = "{0} | {1}" -f $title, $cleanUrl
     Write-DebugLog "[DEBUG] Entrada de historial a guardar: '$historyEntry'" -ForegroundColor Cyan
-    
+
     # Forzar una pausa antes de leer
     Start-Sleep -Milliseconds 50
     [System.Windows.Forms.Application]::DoEvents()
-    
+
     Write-DebugLog "[DEBUG] Leyendo historial desde: $script:LogFile" -ForegroundColor Cyan
-    
+
     $currentEntries = @()
     try {
         if (Test-Path -LiteralPath $script:LogFile) {
             $content = [System.IO.File]::ReadAllText($script:LogFile, [System.Text.Encoding]::UTF8)
             Write-DebugLog "[DEBUG] Contenido actual del archivo (raw): '$content'" -ForegroundColor Gray
-            
-            $currentEntries = $content -split "`r?`n" | 
-                ForEach-Object { $_.Trim() } | 
+
+            $currentEntries = $content -split "`r?`n" |
+                ForEach-Object { $_.Trim() } |
                 Where-Object { $_ -and ($_ -notmatch '^\s*$') }
         }
     } catch {
@@ -2609,13 +2609,13 @@ function Add-HistoryUrl {
         Write-DebugLog "[DEBUG] Inicializando lista vacía" -ForegroundColor Yellow
         $currentEntries = @()
     }
-    
+
     Write-DebugLog "[DEBUG] Entradas actuales procesadas: $($currentEntries.Count)" -ForegroundColor Cyan
     Write-DebugLog "[DEBUG] Entradas: $($currentEntries -join ' | ')" -ForegroundColor Gray
-    
+
     $exists = $false
     Write-DebugLog "[DEBUG] Verificando si '$cleanUrl' ya existe en el historial..." -ForegroundColor Cyan
-    
+
     foreach ($entry in $currentEntries) {
         Write-DebugLog "[DEBUG] Comparando con entrada: '$entry'" -ForegroundColor Gray
         if ($entry -match '\|\s*(.+)$') {
@@ -2635,27 +2635,27 @@ function Add-HistoryUrl {
             }
         }
     }
-    
+
     if (-not $exists) {
         Write-DebugLog "[DEBUG] URL no existe en historial, procediendo a guardar..." -ForegroundColor Green
         $newList = @($historyEntry) + $currentEntries
         Write-DebugLog "[DEBUG] Nueva lista tendrá $($newList.Count) elementos" -ForegroundColor Cyan
-        
-        if ($newList.Count -gt 200) { 
+
+        if ($newList.Count -gt 200) {
             Write-DebugLog "[DEBUG] Recortando lista a 200 elementos" -ForegroundColor Yellow
-            $newList = $newList[0..199] 
+            $newList = $newList[0..199]
         }
-        
+
         try {
             Write-DebugLog "[DEBUG] Intentando escribir en: $script:LogFile" -ForegroundColor Cyan
             $contentToWrite = ($newList -join "`r`n") + "`r`n"
             Write-DebugLog "[DEBUG] Contenido a escribir (primeros 500 chars): '$($contentToWrite.Substring(0, [Math]::Min(500, $contentToWrite.Length)))'" -ForegroundColor Gray
-            
+
             # Usar StreamWriter para mayor control sobre el encoding
             $stream = [System.IO.StreamWriter]::new($script:LogFile, $false, [System.Text.Encoding]::UTF8)
             $stream.Write($contentToWrite)
             $stream.Close()
-            
+
             Write-DebugLog "[HISTORIAL] ¡Guardado exitosamente: $historyEntry" -ForegroundColor Green
         } catch {
             Write-DebugLog "[ERROR] No se pudo guardar en el historial: $($_.Exception.Message)" -ForegroundColor Red
@@ -2664,7 +2664,7 @@ function Add-HistoryUrl {
     } else {
         Write-DebugLog "[HISTORIAL] URL ya existe en historial: $cleanUrl" -ForegroundColor Yellow
     }
-    
+
     Write-DebugLog "[DEBUG] Add-HistoryUrl finalizada" -ForegroundColor Cyan
 }
 function Get-HistoryUrls {
@@ -2678,7 +2678,7 @@ function Get-HistoryUrls {
         } else {
             $lines = @()
         }
-        
+
         $urls = @()
         foreach ($line in $lines) {
             if ($line -match '\|\s*(.+)$') {
@@ -2688,8 +2688,8 @@ function Get-HistoryUrls {
             }
         }
         return $urls
-    } catch { 
-        return @() 
+    } catch {
+        return @()
     }
 }
 $btnPickCookies.Add_Click({
@@ -2720,7 +2720,7 @@ $btnSites.Add_Click({
                                     -Size (New-Object System.Drawing.Size(780,28)) `
                                     -Text "(buscar sitio)"
         $txtFiltro.ForeColor = [System.Drawing.Color]::Gray
-        
+
         $txtFiltro.Add_GotFocus({
             if ($this.Text -eq "(buscar sitio)") { $this.Text = ""; $this.ForeColor = [System.Drawing.Color]::Black }
         })
@@ -2898,8 +2898,8 @@ function Invoke-Capture {
     $p.StartInfo = $psi
     [void]$p.Start()
     if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
-        try { 
-            $p.Kill() 
+        try {
+            $p.Kill()
             Write-Host "[TIMEOUT] Proceso terminado por timeout después de $TimeoutSeconds segundos" -ForegroundColor Red
         } catch { }
         return [pscustomobject]@{ ExitCode = -1; StdOut = ""; StdErr = "Timeout después de $TimeoutSeconds segundos" }
@@ -2931,11 +2931,11 @@ function Convert-WebpUrlToPng {
         $p.WaitForExit()
         if ($p.ExitCode -eq 0 -and (Test-Path $tmpOut)) { return $tmpOut }
         return $null
-    } catch { 
+    } catch {
         Write-Host "[WEBP-CONVERT] Error: $($_.Exception.Message)" -ForegroundColor Red
-        return $null 
+        return $null
     }
-    finally { 
+    finally {
         if ($webClient) { $webClient.Dispose() }
         try { if (Test-Path $tmpIn) { Remove-Item $tmpIn -Force } } catch {}
     }
@@ -3024,7 +3024,7 @@ function Invoke-YtDlpConsoleProgress {
                 $parts = [regex]::Split($chunk, "\r\n|\n|\r")
                 for ($i=0; $i -lt $parts.Length-1; $i++) { _PrintLine $parts[$i] }
             }
-            if ($bufOut) { $bufOut = ([regex]::Split($bufOut, "\r\n|\n|\r") | Select-Object -Last 1) } 
+            if ($bufOut) { $bufOut = ([regex]::Split($bufOut, "\r\n|\n|\r") | Select-Object -Last 1) }
             if ($bufErr) { $bufErr = ([regex]::Split($bufErr, "\r\n|\n|\r") | Select-Object -Last 1) }
             [System.Windows.Forms.Application]::DoEvents()
             Start-Sleep -Milliseconds 80
@@ -3048,15 +3048,15 @@ function Invoke-YtDlpQuery {
         [Parameter(Mandatory=$true)][string[]]$Args,
         [switch]$UpdateUi
     )
-    try { 
-        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     } catch {}
     $global:ProgressPreference = 'SilentlyContinue'
     $tmpDir = [System.IO.Path]::GetTempPath()
     $errFile = Join-Path $tmpDir ("yt-dlp-stderr_{0}.log" -f ([guid]::NewGuid()))
     $outFile = Join-Path $tmpDir ("yt-dlp-stdout_{0}.log" -f ([guid]::NewGuid()))
-    $argLine = ($Args | ForEach-Object { 
-        if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ } 
+    $argLine = ($Args | ForEach-Object {
+        if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
     }) -join ' '
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $ExePath
@@ -3072,7 +3072,7 @@ function Invoke-YtDlpQuery {
     $started = $proc.Start()
     if (-not $started) {
         Write-Host "[ERROR] No se pudo iniciar el proceso: $ExePath" -ForegroundColor Red
-        return [pscustomobject]@{ 
+        return [pscustomobject]@{
             ExitCode = -1
             StdOut = ""
             StdErr = "No se pudo iniciar el proceso"
@@ -3085,13 +3085,13 @@ function Invoke-YtDlpQuery {
     $stderr = $stderrTask.GetAwaiter().GetResult()
     $exitCode = $proc.ExitCode
     $proc.Dispose()
-    return [pscustomobject]@{ 
+    return [pscustomobject]@{
         ExitCode = $exitCode
         StdOut = $stdout
         StdErr = $stderr
     }
 }
-        
+
 $btnDescargar.Add_Click({
     Refresh-GateByDeps
     $currentUrl = Get-CurrentUrl
@@ -3154,7 +3154,7 @@ $btnDescargar.Add_Click({
         $videoSel = Get-SelectedFormatId -Combo $cmbVideoFmt
         $audioSel = Get-SelectedFormatId -Combo $cmbAudioFmt
         $hayFormatosAudio = ($script:formatsAudio -and $script:formatsAudio.Count -gt 0)
-        
+
         # Lógica SIMPLE y DIRECTA
         if ($videoSel -and $audioSel) {
             # SI hay selección de audio, FORZAR combinación
