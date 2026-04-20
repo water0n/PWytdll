@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     YTDLL — Módulo de GUI (WPF)
     Construye la interfaz gráfica principal con Windows Presentation Foundation.
@@ -96,6 +96,7 @@ $ColorSubText     = "#86868B"
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- Header -->
                 <RowDefinition Height="*"/>    <!-- Content -->
+                <RowDefinition Height="Auto"/> <!-- Footer Actions -->
             </Grid.RowDefinitions>
 
             <!-- Header (Draggable Area) -->
@@ -103,7 +104,7 @@ $ColorSubText     = "#86868B"
                 <Grid>
                     <TextBlock Text="YTDLL" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,15,0">
-                        <Button Name="btnPickCookies" Content="&amp;#x1F36A;" ToolTip="Cookies.txt" Background="Transparent" Foreground="$ColorSubText" BorderThickness="0" FontSize="18" Margin="0,0,10,0" Cursor="Hand"/>
+                        <Button Name="btnPickCookies" Content="🍪" ToolTip="Cookies.txt" Background="Transparent" Foreground="$ColorSubText" BorderThickness="0" FontSize="18" Margin="0,0,10,0" Cursor="Hand"/>
                         <Button Name="btnInfo" Content="?" ToolTip="Información" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Width="24" Height="24" FontSize="14" FontWeight="Bold" Cursor="Hand">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
@@ -118,11 +119,11 @@ $ColorSubText     = "#86868B"
             </Border>
 
             <!-- Main Content -->
-            <StackPanel Grid.Row="1" Margin="25,5,25,25">
+            <StackPanel Grid.Row="1" Margin="25,5,25,15">
                 
                 <!-- URL Input -->
                 <TextBox Name="txtUrl" Text="Escribe la URL del video" FontSize="16" TextAlignment="Center" Foreground="#8E8E93" Height="45" Margin="0,0,0,5" VerticalContentAlignment="Center"/>
-                <Button Name="btnUrlHistory" Content="&amp;#x25BE; Historial" Background="Transparent" Foreground="$ColorPrimary" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right" Margin="0,0,0,20">
+                <Button Name="btnUrlHistory" Content="▾ Historial" Background="Transparent" Foreground="$ColorPrimary" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right" Margin="0,0,0,20">
                     <Button.ContextMenu>
                         <ContextMenu x:Name="ctxUrlHistory" Placement="Bottom" PlacementTarget="{Binding RelativeSource={RelativeSource AncestorType=Button}}"/>
                     </Button.ContextMenu>
@@ -136,7 +137,7 @@ $ColorSubText     = "#86868B"
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox Name="txtDestino" Grid.Column="0" IsReadOnly="True" Background="#E5E5EA" Foreground="$ColorSubText"/>
-                    <Button Name="btnPickDestino" Grid.Column="1" Content="&amp;#x1F4C1;" Width="36" Margin="10,0,0,0" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Cursor="Hand">
+                    <Button Name="btnPickDestino" Grid.Column="1" Content="📁" Width="36" Margin="10,0,0,0" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Cursor="Hand">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border Background="{TemplateBinding Background}" CornerRadius="8">
@@ -159,7 +160,7 @@ $ColorSubText     = "#86868B"
 
                 <!-- Preview Image -->
                 <Label Content="Vista previa"/>
-                <Border CornerRadius="12" Background="#E5E5EA" Height="180" Margin="0,0,0,20">
+                <Border CornerRadius="12" Background="#E5E5EA" Height="170" Margin="0,0,0,20">
                     <Border.Effect>
                         <DropShadowEffect Color="Black" Opacity="0.1" BlurRadius="10" ShadowDepth="2" Direction="270"/>
                     </Border.Effect>
@@ -172,38 +173,38 @@ $ColorSubText     = "#86868B"
                 </Border>
 
                 <!-- Status Console -->
-                <Border Background="#E5E5EA" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                <Border Background="#E5E5EA" CornerRadius="8" Padding="15">
                     <TextBlock Name="lblEstadoConsulta" Text="Estado: sin consultar" FontFamily="Consolas" FontSize="12" Foreground="$ColorText" TextWrapping="Wrap" TextAlignment="Center"/>
                 </Border>
 
-                <!-- Footer Actions -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Button Name="btnExit" Grid.Column="0" Content="Salir" Height="36" Background="#1D1D1F" Foreground="White" BorderThickness="0" Cursor="Hand">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}" CornerRadius="8">
-                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-                    <Button Name="btnSites" Grid.Column="2" Content="Sitios compatibles" Height="36" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Cursor="Hand">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}" CornerRadius="8">
-                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-                </Grid>
-
             </StackPanel>
+
+            <!-- Footer Actions -->
+            <Grid Grid.Row="2" Margin="25,0,25,25">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Name="btnExit" Grid.Column="0" Content="Salir" Height="36" Background="#1D1D1F" Foreground="White" BorderThickness="0" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+                <Button Name="btnSites" Grid.Column="2" Content="Sitios compatibles" Height="36" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
         </Grid>
     </Border>
 </Window>
@@ -529,7 +530,7 @@ function Show-AppInfo {
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         
-        <TextBlock Grid.Row="0" Text="YTDLL — Versión: $version" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
+        <TextBlock Grid.Row="0" Text="YTDLL — Versión: `$version" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
         
         <CheckBox Name="chkDebug" Grid.Row="1" Content="Mostrar debug en consola" Margin="0,0,0,20"/>
         
@@ -678,7 +679,7 @@ function Show-SitesDialog {
     [xml]$xamlSites = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Sitios compatibles — $($fmt.Count) detectados" Height="600" Width="800"
+        Title="Sitios compatibles — `$(`$fmt.Count) detectados" Height="600" Width="800"
         WindowStartupLocation="CenterOwner" Background="#F5F5F7">
     <Window.Resources>
         <Style TargetType="Button">
@@ -724,7 +725,7 @@ function Show-SitesDialog {
                     </ControlTemplate>
                 </TextBox.Template>
             </TextBox>
-            <TextBlock Name="lblCount" Grid.Column="1" Text="0/$($allSites.Count)" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="14"/>
+            <TextBlock Name="lblCount" Grid.Column="1" Text="0/`$(`$allSites.Count)" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="14"/>
         </Grid>
         
         <ListBox Name="lstSites" Grid.Row="1" FontFamily="Consolas" FontSize="13" BorderThickness="0" Margin="0,0,0,15">

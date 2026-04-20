@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     YTDLL — Módulo de Dependencias
     Funciones para verificar, instalar, actualizar y desinstalar herramientas externas
@@ -278,10 +278,10 @@ function Refresh-DependencyLabel {
     $ver = Get-ToolVersion -Command $CommandName -ArgsForVersion $VersionArgs -Parse $Parse
     if ($ver) {
         $LabelRef.Value.Text     = ("{0}: {1}" -f $FriendlyName, $ver)
-        $LabelRef.Value.ForeColor = [System.Drawing.Color]::ForestGreen
+        $LabelRef.Value.Foreground = [System.Windows.Media.Brushes]::ForestGreen
     } else {
         $LabelRef.Value.Text     = ("{0}: no instalado" -f $FriendlyName)
-        $LabelRef.Value.ForeColor = [System.Drawing.Color]::Red
+        $LabelRef.Value.Foreground = [System.Windows.Media.Brushes]::Red
     }
     Refresh-GateByDeps
 }
@@ -359,7 +359,7 @@ function Uninstall-Dependency {
     try {
         Start-Process -FilePath "choco" -ArgumentList @("uninstall",$ChocoPkg,"-y") -Wait -NoNewWindow
         $LabelRef.Value.Text     = ("{0}: no instalado" -f $FriendlyName)
-        $LabelRef.Value.ForeColor = [System.Drawing.Color]::Red
+        $LabelRef.Value.Foreground = [System.Windows.Media.Brushes]::Red
         [System.Windows.Forms.MessageBox]::Show(
             ("{0} ha sido desinstalado.{1}{1}Te recomiendo cerrar y abrir PowerShell para refrescar el PATH." `
                 -f $FriendlyName,[Environment]::NewLine),
