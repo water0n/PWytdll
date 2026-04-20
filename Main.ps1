@@ -285,6 +285,7 @@ $btnDescargar.Add_Click({
         "--no-part","--ignore-config"
     )
     $dlpArgs += $noPlaylistArg   # doble por seguridad
+    $dlpArgs += Get-JsRuntimeArgs
     $dlpArgs += Get-ActiveCookiesArgs
 
     $dlpArgs += $script:ultimaURL
@@ -303,6 +304,7 @@ $btnDescargar.Add_Click({
                 "--extractor-args","youtube:player_client=default,-web_safari,-web_embedded,-tv"
             )
             $retryArgs += Get-ActiveCookiesArgs
+            $retryArgs += Get-JsRuntimeArgs
             $retryArgs += $script:ultimaURL
             $exit = Invoke-YtDlpConsoleProgress -ExePath $yt.Source -Args $retryArgs -UpdateUi
         }

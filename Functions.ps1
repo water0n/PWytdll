@@ -68,6 +68,14 @@ function Get-ActiveCookiesArgs {
     return @("--cookies", $script:cookiesPath)
 }
 
+
+function Get-JsRuntimeArgs {
+    try { $node = Get-Command node -ErrorAction Stop } catch { return @() }
+    if ($node -and -not [string]::IsNullOrWhiteSpace($node.Source)) {
+        return @("--js-runtimes", ("node:{0}" -f $node.Source))
+    }
+    return @("--js-runtimes", "node")
+}
 function Get-YouTubeExtractorArgs {
     param(
         [string]$Url,
@@ -106,6 +114,7 @@ function Invoke-YtDlpJsonQuery {
         [int]$TimeoutSec = 60
     )
     $args = @("-J","--no-playlist","--no-warnings","--ignore-config")
+    $args += Get-JsRuntimeArgs
     $args += Get-ActiveCookiesArgs
     $args += Get-YouTubeExtractorArgs -Url $Url
     $args += $Url
@@ -113,6 +122,7 @@ function Invoke-YtDlpJsonQuery {
     if (Test-YouTubeMissingPotRetry -Url $Url -StdOut $res.StdOut -StdErr $res.StdErr) {
         Write-DebugLog "[DEBUG] Reintentando consulta JSON con youtube:formats=missing_pot" -ForegroundColor Yellow
         $retryArgs = @("-J","--no-playlist","--no-warnings","--ignore-config")
+        $retryArgs += Get-JsRuntimeArgs
         $retryArgs += Get-ActiveCookiesArgs
         $retryArgs += Get-YouTubeExtractorArgs -Url $Url -IncludeMissingPot
         $retryArgs += $Url
@@ -127,6 +137,17 @@ function Get-CleanUrl {
     $u = $u -replace '^www\.', ''
     $u = $u -replace '/+$', ''
     return $u.Trim()
+}
+
+function Normalize-InputUrl {
+    param([string]$Url)
+    if ([string]::IsNullOrWhiteSpace($Url)) { return $Url }
+    $u = $Url.Trim()
+    if ($u -eq $global:UrlPlaceholder) { return "" }
+    if ($u -match '^(?i)[a-z][a-z0-9+\.-]*://') { return $u }
+    if ($u -match '^(?i)//') { return "https:$u" }
+    if ($u -match '^(?i)[\w.-]+\.[A-Za-z]{2,}([/:?#]|$)') { return "https://$u" }
+    return $u
 }
 
 function Get-DisplayUrl {
@@ -342,7 +363,7 @@ function Get-CurrentUrl {
     if (-not $txtUrl) { return "" }
     $t = ($txtUrl.Text).Trim()
     if ($t -eq $global:UrlPlaceholder) { return "" }
-    return $t
+    return (Normalize-InputUrl -Url $t)
 }
 
 function Invoke-Capture {
@@ -569,6 +590,7 @@ function Extract-VideoFromPlaylist {
     try {
         $yt  = Get-Command yt-dlp -ErrorAction Stop
         $tmpArgs = @("--flat-playlist","--print","url","--no-warnings","--playlist-items","1")
+        $tmpArgs += Get-JsRuntimeArgs
         $tmpArgs += Get-ActiveCookiesArgs
 
         $tmpArgs += $Url
@@ -610,6 +632,7 @@ function Get-BestStreamUrl {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return $null }
     $args = @("-g","-f","best",$Url)
+    $args += Get-JsRuntimeArgs
 
     $res = Invoke-Capture -ExePath $yt.Source -Args $args
     if ($res.ExitCode -ne 0) { return $null }
@@ -624,6 +647,7 @@ function Get-ThumbnailListFromYtDlp {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return @() }
     $tmpArgs = @("--list-thumbnails")
+    $tmpArgs += Get-JsRuntimeArgs
 
     $tmpArgs += $Url
     $res = Invoke-Capture -ExePath $yt.Source -Args $tmpArgs
@@ -671,6 +695,7 @@ function Fetch-ThumbnailFile {
     Get-ChildItem -Path (Get-TempThumbPattern) -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
     $outTmpl = Join-Path $script:ThumbnailsDir "ytdll_thumb_%(id)s.%(ext)s"
     $args = @("--skip-download","--quiet","--no-warnings","--write-thumbnail","--convert-thumbnails","jpg","-o",$outTmpl,"--no-playlist")
+    $args += Get-JsRuntimeArgs
     $args += Get-ActiveCookiesArgs
     if ($Url -match 'youtube\.com.*list=') { $args += "--playlist-items","1" }
 
@@ -857,8 +882,13 @@ function Populate-FormatCombos {
 
 function Invoke-ConsultaFromUI {
     param([Parameter(Mandatory=$true)][string]$Url)
+    $Url = Normalize-InputUrl -Url $Url
     $script:originalUrl  = $Url
     $script:isPlaylist   = Test-YouTubePlaylist -Url $Url
+    if ($txtUrl -and -not [string]::IsNullOrWhiteSpace($Url) -and $txtUrl.Text -ne $Url) {
+        $txtUrl.Text = $Url
+        $txtUrl.Foreground = [System.Windows.Media.Brushes]::Black
+    }
     if ($script:isPlaylist) {
         $lblEstadoConsulta.Text     = "Playlist detectada, extrayendo primer video..."
         $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkOrange
