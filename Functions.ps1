@@ -343,6 +343,10 @@ function Invoke-Capture {
     $psi.RedirectStandardError  = $true
     $psi.UseShellExecute        = $false
     $psi.CreateNoWindow         = $true
+    Write-DebugLog "Exec: $ExePath $($psi.Arguments)"
+    $psi.RedirectStandardError  = $true
+    $psi.UseShellExecute        = $false
+    $psi.CreateNoWindow         = $true
     $p = New-Object System.Diagnostics.Process
     $p.StartInfo = $psi
     [void]$p.Start()
@@ -373,7 +377,7 @@ function Invoke-CaptureResponsive {
     $outFile = Join-Path $tmpDir ("proc_stdout_{0}.log" -f ([guid]::NewGuid()))
     $errFile = Join-Path $tmpDir ("proc_stderr_{0}.log" -f ([guid]::NewGuid()))
     $argLine = ($Args | ForEach-Object { if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ } }) -join ' '
-    $proc    = Start-Process -FilePath $ExePath -ArgumentList $argLine `
+    Write-DebugLog "Exec: $ExePath $argLine"`n    $proc    = Start-Process -FilePath $ExePath -ArgumentList $argLine `
                  -NoNewWindow -PassThru `
                  -RedirectStandardOutput $outFile `
                  -RedirectStandardError  $errFile
@@ -942,4 +946,5 @@ function Invoke-ConsultaFromUI {
         return $false
     }
 }
+
 
