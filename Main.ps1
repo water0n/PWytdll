@@ -105,8 +105,8 @@ $script:ultimaURL         = $null
 $script:ultimoTitulo      = $null
 $script:lastThumbUrl      = $null
 $script:formatsEnumerated = $false
-$script:cookiesPath       = $null
-$script:cookiesBrowser    = $null
+$script:cookiesPath       = Get-IniValue -Section "cookies" -Key "Path" -DefaultValue $null
+$script:cookiesBrowser    = Get-IniValue -Section "cookies" -Key "Browser" -DefaultValue $null
 $script:ultimaRutaDescarga = Get-IniValue -Section "ruta" -Key "Destino" -DefaultValue ([Environment]::GetFolderPath('Desktop'))
 $global:UrlPlaceholder    = "BUSCAR VIDEO"
 
@@ -157,78 +157,6 @@ Write-Host "=============================================" -ForegroundColor Dark
 $btnPickCookies.Add_Click({
     $ctxCookies = $formPrincipal.FindName("ctxCookies")
     $ctxCookies.IsOpen = $true
-})
-
-$formPrincipal.FindName("miCookieEdge").add_Click({
-    $res = Export-BrowserCookies -Browser "edge"
-    if ($res) {
-        $script:cookiesPath = $res
-        $script:cookiesBrowser = $null
-        Set-IniValue -Section "cookies" -Key "Browser" -Value "edge"
-        Set-IniValue -Section "cookies" -Key "Path" -Value $res
-        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Edge exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-    }
-})
-$formPrincipal.FindName("miCookieChrome").add_Click({
-    $res = Export-BrowserCookies -Browser "chrome"
-    if ($res) {
-        $script:cookiesPath = $res
-        $script:cookiesBrowser = $null
-        Set-IniValue -Section "cookies" -Key "Browser" -Value "chrome"
-        Set-IniValue -Section "cookies" -Key "Path" -Value $res
-        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Chrome exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-    }
-})
-$formPrincipal.FindName("miCookieFirefox").add_Click({
-    $res = Export-BrowserCookies -Browser "firefox"
-    if ($res) {
-        $script:cookiesPath = $res
-        $script:cookiesBrowser = $null
-        Set-IniValue -Section "cookies" -Key "Browser" -Value "firefox"
-        Set-IniValue -Section "cookies" -Key "Path" -Value $res
-        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Firefox exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-    }
-})
-$formPrincipal.FindName("miCookieBrave").add_Click({
-    $res = Export-BrowserCookies -Browser "brave"
-    if ($res) {
-        $script:cookiesPath = $res
-        $script:cookiesBrowser = $null
-        Set-IniValue -Section "cookies" -Key "Browser" -Value "brave"
-        Set-IniValue -Section "cookies" -Key "Path" -Value $res
-        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Brave exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-    }
-})
-$formPrincipal.FindName("miCookieOpera").add_Click({
-    $res = Export-BrowserCookies -Browser "opera"
-    if ($res) {
-        $script:cookiesPath = $res
-        $script:cookiesBrowser = $null
-        Set-IniValue -Section "cookies" -Key "Browser" -Value "opera"
-        Set-IniValue -Section "cookies" -Key "Path" -Value $res
-        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Opera exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-    }
-})
-$formPrincipal.FindName("miCookieVivaldi").add_Click({
-    $res = Export-BrowserCookies -Browser "vivaldi"
-    if ($res) {
-        $script:cookiesPath = $res
-        $script:cookiesBrowser = $null
-        Set-IniValue -Section "cookies" -Key "Browser" -Value "vivaldi"
-        Set-IniValue -Section "cookies" -Key "Path" -Value $res
-        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Vivaldi exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-    }
-})
-
-$formPrincipal.FindName("miCookieFile").add_Click({
-    $ofd = New-Object System.Windows.Forms.OpenFileDialog
-    $ofd.Title  = "Selecciona cookies.txt"
-    $ofd.Filter = "Cookies (*.txt)|*.txt|Todos (*.*)|*.*"
-    if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $script:cookiesPath = $ofd.FileName
-        $script:cookiesBrowser = $null
-        [System.Windows.MessageBox]::Show("Cookies configuradas archivo: $($script:cookiesPath)", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-    }
 })
 
 # ── Carpeta de destino ────────────────────────────────────────────────────────
@@ -357,6 +285,7 @@ $btnDescargar.Add_Click({
         "--no-part","--ignore-config"
     )
     $dlpArgs += $noPlaylistArg   # doble por seguridad
+    $dlpArgs += Get-ActiveCookiesArgs
 
     $dlpArgs += $script:ultimaURL
     $dlpArgs += @("--retries","5","--retry-sleep","2","-N","4")
@@ -373,6 +302,8 @@ $btnDescargar.Add_Click({
                 "--progress-template","download:%(progress._percent_str)s ETA:%(progress._eta_str)s SPEED:%(progress._speed_str)s",
                 "--extractor-args","youtube:player_client=default,-web_safari,-web_embedded,-tv"
             )
+            $retryArgs += Get-ActiveCookiesArgs
+            $retryArgs += $script:ultimaURL
             $exit = Invoke-YtDlpConsoleProgress -ExePath $yt.Source -Args $retryArgs -UpdateUi
         }
         if ($null -eq $exit -and $script:lastYtDlpExitCode -ne $null) { $exit = $script:lastYtDlpExitCode }
@@ -412,3 +343,4 @@ try { $txtDestino.Text = $script:ultimaRutaDescarga } catch {}
 #  MOSTRAR LA APLICACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 $formPrincipal.ShowDialog() | Out-Null
+

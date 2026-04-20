@@ -59,6 +59,68 @@ function Write-DebugLog {
     if ($global:DebugEnabled) { Write-Host $Message -ForegroundColor $ForegroundColor }
 }
 
+function Get-ActiveCookiesArgs {
+    if ([string]::IsNullOrWhiteSpace($script:cookiesPath)) { return @() }
+    if (-not (Test-Path -LiteralPath $script:cookiesPath)) {
+        Write-Host "[COOKIES] ADVERTENCIA: Archivo de cookies no encontrado: $($script:cookiesPath)" -ForegroundColor Yellow
+        return @()
+    }
+    return @("--cookies", $script:cookiesPath)
+}
+
+function Get-YouTubeExtractorArgs {
+    param(
+        [string]$Url,
+        [switch]$IncludeMissingPot
+    )
+    if ([string]::IsNullOrWhiteSpace($Url)) { return @() }
+    if ($Url -match '(?i)(youtube\.com|youtu\.be)') {
+        if ($IncludeMissingPot) {
+            return @("--extractor-args", "youtube:formats=missing_pot")
+        }
+        return @("--extractor-args", "youtube:player_client=default,-web_safari,-web_embedded,-tv")
+    }
+    return @()
+}
+
+function Test-YouTubeMissingPotRetry {
+    param(
+        [string]$Url,
+        [string]$StdOut,
+        [string]$StdErr
+    )
+    if ([string]::IsNullOrWhiteSpace($Url) -or $Url -notmatch '(?i)(youtube\.com|youtu\.be)') { return $false }
+    if (-not [string]::IsNullOrWhiteSpace($StdErr)) {
+        if ($StdErr -match 'Requested format is not available' -or $StdErr -match 'PO Token' -or $StdErr -match 'SABR') {
+            return $true
+        }
+    }
+    return (-not [string]::IsNullOrWhiteSpace($StdOut)) -and ($StdOut.Trim() -eq "null")
+}
+
+function Invoke-YtDlpJsonQuery {
+    param(
+        [Parameter(Mandatory=$true)][string]$ExePath,
+        [Parameter(Mandatory=$true)][string]$Url,
+        [string]$WorkingText = "Procesando JSON...",
+        [int]$TimeoutSec = 60
+    )
+    $args = @("-J","--no-playlist","--no-warnings","--ignore-config")
+    $args += Get-ActiveCookiesArgs
+    $args += Get-YouTubeExtractorArgs -Url $Url
+    $args += $Url
+    $res = Invoke-CaptureResponsive -ExePath $ExePath -Args $args -WorkingText $WorkingText -TimeoutSec $TimeoutSec
+    if (Test-YouTubeMissingPotRetry -Url $Url -StdOut $res.StdOut -StdErr $res.StdErr) {
+        Write-DebugLog "[DEBUG] Reintentando consulta JSON con youtube:formats=missing_pot" -ForegroundColor Yellow
+        $retryArgs = @("-J","--no-playlist","--no-warnings","--ignore-config")
+        $retryArgs += Get-ActiveCookiesArgs
+        $retryArgs += Get-YouTubeExtractorArgs -Url $Url -IncludeMissingPot
+        $retryArgs += $Url
+        return Invoke-CaptureResponsive -ExePath $ExePath -Args $retryArgs -WorkingText ($WorkingText + " (missing_pot)") -TimeoutSec $TimeoutSec
+    }
+    return $res
+}
+
 function Get-CleanUrl {
     param([Parameter(Mandatory=$true)][string]$Url)
     $u = $Url -replace '^https?://', ''
@@ -480,7 +542,7 @@ function Invoke-YtDlpConsoleProgress {
 function Get-Metadata {
     param([Parameter(Mandatory=$true)][string]$Url)
     try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return $null }
-    $obj = Invoke-CaptureResponsive -ExePath $yt.Source -Args @("-J","--no-playlist",$Url) -WorkingText "Leyendo metadatos…"
+    $obj = Invoke-YtDlpJsonQuery -ExePath $yt.Source -Url $Url -WorkingText "Leyendo metadatos…" -TimeoutSec 60
     if ($obj.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($obj.StdOut)) { return $null }
     try { $json = $obj.StdOut | ConvertFrom-Json } catch { return $null }
     [pscustomobject]@{
@@ -507,6 +569,7 @@ function Extract-VideoFromPlaylist {
     try {
         $yt  = Get-Command yt-dlp -ErrorAction Stop
         $tmpArgs = @("--flat-playlist","--print","url","--no-warnings","--playlist-items","1")
+        $tmpArgs += Get-ActiveCookiesArgs
 
         $tmpArgs += $Url
         $res = Invoke-Capture -ExePath $yt.Source -Args $tmpArgs
@@ -608,6 +671,7 @@ function Fetch-ThumbnailFile {
     Get-ChildItem -Path (Get-TempThumbPattern) -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
     $outTmpl = Join-Path $script:ThumbnailsDir "ytdll_thumb_%(id)s.%(ext)s"
     $args = @("--skip-download","--quiet","--no-warnings","--write-thumbnail","--convert-thumbnails","jpg","-o",$outTmpl,"--no-playlist")
+    $args += Get-ActiveCookiesArgs
     if ($Url -match 'youtube\.com.*list=') { $args += "--playlist-items","1" }
 
     $args += $Url
@@ -705,13 +769,10 @@ function Fetch-Formats {
     }
     $lblEstadoConsulta.Text     = "Obteniendo lista de formatos..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
-    $args1 = @("-J","--no-playlist","--ignore-config","--no-warnings")
-
-    $args1 += $Url
-    $obj   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Obteniendo formatos" -TimeoutSec 60
+    $obj = Invoke-YtDlpJsonQuery -ExePath $yt.Source -Url $Url -WorkingText "Obteniendo formatos" -TimeoutSec 60
     if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
         $lblEstadoConsulta.Text = "Reintentando obtención de formatos..."
-        $obj = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Reintentando formatos" -TimeoutSec 60
+        $obj = Invoke-YtDlpJsonQuery -ExePath $yt.Source -Url $Url -WorkingText "Reintentando formatos" -TimeoutSec 60
         if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
             $lblEstadoConsulta.Text     = "ERROR: No se pudieron obtener formatos"
             $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
@@ -814,30 +875,31 @@ function Invoke-ConsultaFromUI {
     }
     $btnDescargar.IsEnabled = $false; $txtUrl.IsEnabled = $false
     if ($script:ultimaURL -ne $Url) { $script:videoConsultado = $false; $script:formatsEnumerated = $false }
-    $args = @("--no-playlist","--no-warnings","--ignore-config","--print","title","--print","thumbnail","--print","id")
-
-    $args += $Url
     $lblEstadoConsulta.Text     = "Consultando video..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
-    $res   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Consultando video" -TimeoutSec 60
+    $res = Invoke-YtDlpJsonQuery -ExePath $yt.Source -Url $Url -WorkingText "Consultando video" -TimeoutSec 60
     Write-DebugLog "[DEBUG] yt-dlp ExitCode: $($res.ExitCode)" -ForegroundColor Yellow
+    if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) {
+        Write-DebugLog "[DEBUG] StdErr: $($res.StdErr)" -ForegroundColor Red
+    }
     if ([string]::IsNullOrWhiteSpace($res.StdOut)) {
         Write-DebugLog "[DEBUG] StdOut está vacío o nulo" -ForegroundColor Red
-        if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) {
-            Write-DebugLog "[DEBUG] StdErr: $($res.StdErr)" -ForegroundColor Red
+    } elseif (($res.StdOut.Trim()) -eq "null") {
+        Write-DebugLog "[DEBUG] StdOut contiene JSON literal null" -ForegroundColor Red
+    }
+    $metaJson = $null
+    if (-not [string]::IsNullOrWhiteSpace($res.StdOut)) {
+        try { $metaJson = $res.StdOut | ConvertFrom-Json } catch {
+            Write-DebugLog "[DEBUG] JSON inválido en consulta: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
-    $lines = @()
-    if (-not [string]::IsNullOrWhiteSpace($res.StdOut)) {
-        $lines = $res.StdOut -split "`r?`n" | Where-Object { $_.Trim() -ne "" }
-    }
-    $hasValidData = ($lines.Count -ge 3) -and (-not [string]::IsNullOrWhiteSpace($lines[0]))
-    if ($res.ExitCode -eq 0 -or $hasValidData) {
-        $title    = if ($lines.Count -gt 0) { $lines[0] } else { "Título no disponible" }
-        $thumbUrl = if ($lines.Count -gt 1) { $lines[1] } else { $null }
-        $script:videoConsultado   = $true
+    $hasValidData = ($null -ne $metaJson) -and (-not [string]::IsNullOrWhiteSpace($metaJson.title))
+    if ($hasValidData) {
+        $title    = $metaJson.title
+        $thumbUrl = Get-BestThumbnailUrl -Json $metaJson
         $script:ultimaURL         = $Url
+        $script:videoConsultado   = $true
         $script:ultimoTitulo      = $title
         $script:lastThumbUrl      = $thumbUrl
         $script:formatsEnumerated = $false
@@ -947,6 +1009,7 @@ function Export-BrowserCookies {
     $cookieArgs = @(
         "--cookies-from-browser", $Browser,
         "--cookies", $tmpCookie,
+        "--extractor-args", "youtubetab:skip=authcheck",
         "--ignore-config", "--no-warnings",
         "https://www.youtube.com/robots.txt"
     )
@@ -965,14 +1028,22 @@ function Export-BrowserCookies {
 
     $existe = Test-Path $tmpCookie
     $tamano = if ($existe) { (Get-Item $tmpCookie).Length } else { 0 }
+    $cookieFileReady = $existe -and $tamano -ge 50
+    $reportedExtraction = (-not [string]::IsNullOrWhiteSpace($res.StdOut)) -and ($res.StdOut -match "Extracted \d+ cookies from")
     Write-DebugLog "[DEBUG] Archivo existe: $existe | Tamano: $tamano bytes" -ForegroundColor DarkGray
 
-    if ($res.ExitCode -ne 0 -or -not $existe -or $tamano -lt 50) {
+    if ((-not $cookieFileReady) -or (($res.ExitCode -ne 0) -and (-not $reportedExtraction))) {
         $lblEstadoConsulta.Text     = "ERROR: No se pudieron extraer cookies de $Browser"
         $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
+        $isDpapiFailure = (-not [string]::IsNullOrWhiteSpace($res.StdErr)) -and (
+            $res.StdErr -match "Failed to decrypt with DPAPI" -or
+            $res.StdErr -match "'NoneType' object has no attribute 'decode'"
+        )
 
         $detail = if ($res.ExitCode -eq -1) {
             "Tiempo de espera agotado (180s). Cierra $Browser completamente y reintenta."
+        } elseif ($isDpapiFailure) {
+            "yt-dlp no pudo descifrar las cookies con DPAPI. Esto coincide con un problema conocido de Chrome/Chromium en Windows."
         } elseif (-not $existe) {
             "yt-dlp termino sin crear el archivo. Error: $($res.StdErr)"
         } elseif ($tamano -lt 50) {
@@ -982,19 +1053,37 @@ function Export-BrowserCookies {
         }
 
         Write-Host "[COOKIES] FALLO: $detail" -ForegroundColor Red
-        [System.Windows.MessageBox]::Show(
-            "No se pudieron extraer las cookies de $Browser.`n`n" +
-            "Pasos para solucionar:`n" +
-            "  1. Cierra $Browser completamente`n" +
-            "     (incluyendo procesos en segundo plano / bandeja del sistema)`n" +
-            "  2. Asegurate de haber iniciado sesion en YouTube en $Browser`n" +
-            "  3. Vuelve a intentarlo`n`n" +
-            "Diagnostico:`n$detail",
-            "Error al extraer cookies de $Browser",
-            [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Error
-        ) | Out-Null
+        if ($isDpapiFailure) {
+            [System.Windows.MessageBox]::Show(
+                "No se pudieron extraer las cookies de $Browser.`n`n" +
+                "Diagnostico:`n$detail`n`n" +
+                "Opciones recomendadas:`n" +
+                "  1. Usa Firefox o un navegador que si permita exportar cookies en este equipo`n" +
+                "  2. Exporta un archivo cookies.txt con una extension del navegador y luego cargalo desde el boton de cookies`n" +
+                "  3. Desactiva Application Bound Encryption y reinstala Chrome solo si entiendes el impacto de seguridad`n`n" +
+                "Nota: ese tercer workaround reduce la proteccion contra robo de cookies y borra la sesion actual del navegador.",
+                "Error DPAPI al extraer cookies de $Browser",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Error
+            ) | Out-Null
+        } else {
+            [System.Windows.MessageBox]::Show(
+                "No se pudieron extraer las cookies de $Browser.`n`n" +
+                "Pasos para solucionar:`n" +
+                "  1. Cierra $Browser completamente`n" +
+                "     (incluyendo procesos en segundo plano / bandeja del sistema)`n" +
+                "  2. Asegurate de haber iniciado sesion en YouTube en $Browser`n" +
+                "  3. Vuelve a intentarlo`n`n" +
+                "Diagnostico:`n$detail",
+                "Error al extraer cookies de $Browser",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Error
+            ) | Out-Null
+        }
         return $null
+    }
+    if ($res.ExitCode -ne 0) {
+        Write-Host "[COOKIES] AVISO: yt-dlp devolvio ExitCode $($res.ExitCode), pero el archivo de cookies quedo listo. Se continuara con ese archivo." -ForegroundColor Yellow
     }
 
     Write-Host "[COOKIES] Exito: $tmpCookie ($tamano bytes)" -ForegroundColor Green
@@ -1002,3 +1091,4 @@ function Export-BrowserCookies {
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkGreen
     return $tmpCookie
 }
+

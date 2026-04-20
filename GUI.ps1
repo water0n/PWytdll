@@ -213,13 +213,28 @@ $miCookieOpera   = $formPrincipal.FindName("miCookieOpera")
 $miCookieVivaldi = $formPrincipal.FindName("miCookieVivaldi")
 $miCookieFile    = $formPrincipal.FindName("miCookieFile")
 function Set-CookiesActive {
-    param([string]$Path, [string]$Label)
+    param(
+        [string]$Path,
+        [string]$Label,
+        [string]$Browser = ""
+    )
     $script:cookiesPath = $Path
+    $script:cookiesBrowser = if ([string]::IsNullOrWhiteSpace($Browser)) { $null } else { $Browser }
     $btnPickCookies.ToolTip = "Cookies activas: $Label`nClic para cambiar"
+    Set-IniValue -Section "cookies" -Key "Browser" -Value $Browser
+    Set-IniValue -Section "cookies" -Key "Path" -Value $Path
     Write-Host "[COOKIES] cookiesPath establecido: $Path" -ForegroundColor Green
 }
 $fnExportCookies    = ${function:Export-BrowserCookies}
 $fnSetCookiesActive = ${function:Set-CookiesActive}
+if (-not [string]::IsNullOrWhiteSpace($script:cookiesPath) -and (Test-Path -LiteralPath $script:cookiesPath)) {
+    $cookieLabel = if ([string]::IsNullOrWhiteSpace($script:cookiesBrowser)) {
+        [System.IO.Path]::GetFileName($script:cookiesPath)
+    } else {
+        $script:cookiesBrowser
+    }
+    Set-CookiesActive -Path $script:cookiesPath -Label $cookieLabel -Browser $script:cookiesBrowser
+}
 foreach ($entry in @(
     @{ Item = $miCookieEdge;    Name = "edge"    },
     @{ Item = $miCookieChrome;  Name = "chrome"  },
@@ -236,7 +251,7 @@ foreach ($entry in @(
         Write-Host "[COOKIES] Seleccionado: $browserName" -ForegroundColor Cyan
         $path = & $localExport -Browser $browserName
         if ($path) {
-            & $localSetActive -Path $path -Label $browserName
+            & $localSetActive -Path $path -Label $browserName -Browser $browserName
             [System.Windows.MessageBox]::Show(
                 "Cookies de $browserName configuradas.`nPuedes consultar y descargar ahora.",
                 "Cookies listas",
@@ -252,7 +267,7 @@ $miCookieFile.Add_Click({
     $ofd.Title  = "Selecciona tu archivo cookies.txt"
     $ofd.Filter = "Cookies (*.txt)|*.txt|Todos (*.*)|*.*"
     if ($ofd.ShowDialog() -eq $true) {
-        & $localSetActive2 -Path $ofd.FileName -Label $ofd.SafeFileName
+        & $localSetActive2 -Path $ofd.FileName -Label $ofd.SafeFileName -Browser "file"
         [System.Windows.MessageBox]::Show(
             "Cookies configuradas:`n$($ofd.FileName)",
             "Cookies activas",
@@ -817,3 +832,4 @@ function Show-SitesDialog {
     $winSites.FindName("btnClose").add_Click({ $winSites.Close() })
     $winSites.ShowDialog() | Out-Null
 }
+
