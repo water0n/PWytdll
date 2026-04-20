@@ -88,9 +88,9 @@ $ColorSubText     = "#86868B"
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/> 
-                <RowDefinition Height="*"/>    
-                <RowDefinition Height="Auto"/> 
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Header -->
@@ -127,7 +127,7 @@ $ColorSubText     = "#86868B"
 
             <!-- Main Content -->
             <StackPanel Grid.Row="1" Margin="25,5,25,15">
-                
+
                 <!-- Destination -->
                 <Label Content="Carpeta de destino"/>
                 <Grid Margin="0,0,0,15">
@@ -158,7 +158,7 @@ $ColorSubText     = "#86868B"
                 <!-- Formats -->
                 <Label Content="Formato de VIDEO"/>
                 <ComboBox Name="cmbVideoFmt" Margin="0,0,0,15"/>
-                
+
                 <Label Content="Formato de AUDIO"/>
                 <ComboBox Name="cmbAudioFmt" Margin="0,0,0,25"/>
 
@@ -240,6 +240,65 @@ $lblEstadoConsulta = $formPrincipal.FindName("lblEstadoConsulta")
 $btnExit = $formPrincipal.FindName("btnExit")
 $btnSites = $formPrincipal.FindName("btnSites")
 
+# ── Wiring: menú de cookies 🍪 ───────────────────────────────────────────────
+$miCookieEdge    = $formPrincipal.FindName("miCookieEdge")
+$miCookieChrome  = $formPrincipal.FindName("miCookieChrome")
+$miCookieFirefox = $formPrincipal.FindName("miCookieFirefox")
+$miCookieBrave   = $formPrincipal.FindName("miCookieBrave")
+$miCookieOpera   = $formPrincipal.FindName("miCookieOpera")
+$miCookieVivaldi = $formPrincipal.FindName("miCookieVivaldi")
+$miCookieFile    = $formPrincipal.FindName("miCookieFile")
+
+# Helper: aplicar cookies al estado de la app y actualizar tooltip del botón
+function Set-CookiesActive {
+    param([string]$Path, [string]$Label)
+    $script:cookiesPath = $Path
+    $btnPickCookies.ToolTip = "Cookies activas: $Label`nClic para cambiar"
+    Write-Host "[COOKIES] Cookies activas: $Path" -ForegroundColor Green
+}
+
+# Navegadores: cada handler captura $browserName en su propio scope
+foreach ($entry in @(
+    @{ Item = $miCookieEdge;    Name = "edge"    },
+    @{ Item = $miCookieChrome;  Name = "chrome"  },
+    @{ Item = $miCookieFirefox; Name = "firefox" },
+    @{ Item = $miCookieBrave;   Name = "brave"   },
+    @{ Item = $miCookieOpera;   Name = "opera"   },
+    @{ Item = $miCookieVivaldi; Name = "vivaldi" }
+)) {
+    # Crear closure con copia local del nombre del navegador
+    $browserName = $entry.Name
+    $menuItem    = $entry.Item
+    $menuItem.Add_Click({
+        $path = Export-BrowserCookies -Browser $browserName
+        if ($path) {
+            Set-CookiesActive -Path $path -Label $browserName
+            [System.Windows.MessageBox]::Show(
+                "Cookies de $browserName configuradas.`nPuedes consultar y descargar ahora.",
+                "Cookies listas",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Information
+            ) | Out-Null
+        }
+    }.GetNewClosure())  # GetNewClosure() captura $browserName correctamente en PS5
+}
+
+# Archivo manual
+$miCookieFile.Add_Click({
+    $ofd = New-Object Microsoft.Win32.OpenFileDialog
+    $ofd.Title  = "Selecciona tu archivo cookies.txt"
+    $ofd.Filter = "Cookies (*.txt)|*.txt|Todos (*.*)|*.*"
+    if ($ofd.ShowDialog() -eq $true) {
+        Set-CookiesActive -Path $ofd.FileName -Label $ofd.SafeFileName
+        [System.Windows.MessageBox]::Show(
+            "Archivo de cookies configurado:`n$($ofd.FileName)",
+            "Cookies activas",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Information
+        ) | Out-Null
+    }
+})
+
 # Eventos Base
 $TitleBar.Add_MouseLeftButtonDown({
     $formPrincipal.DragMove()
@@ -299,21 +358,21 @@ function Set-DownloadButtonVisual {
     $haveFfm  = Test-CommandExists -Name "ffmpeg"
     $haveNode = if ($script:RequireNode) { Test-CommandExists -Name "node" } else { $true }
     $depsOk   = $haveYt -and $haveFfm -and $haveNode
-    
+
     if (-not $depsOk) {
         $btnDescargar.IsEnabled = $false
         $btnDescargar.Content = "Descargar"
         $btnDescargar.ToolTip = "Deshabilitado: instala/activa dependencias"
         return
     }
-    
+
     $currentUrl = Get-CurrentUrl
     $isConsulted = $script:videoConsultado -and
                    -not [string]::IsNullOrWhiteSpace($script:ultimaURL) -and
                    ($script:ultimaURL -eq $currentUrl)
-    
+
     $btnDescargar.IsEnabled = $true
-    
+
     if (-not $isConsulted) {
         $btnDescargar.Content = "Buscar Video"
         $btnDescargar.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 122, 255)))
@@ -351,13 +410,13 @@ function Show-PreviewImage {
                 $bitmap.EndInit()
                 $picPreview.Source = $bitmap
                 if ($Titulo) { $picPreview.ToolTip = $Titulo }
-                
+
                 Start-Job -ScriptBlock { param($f); Start-Sleep -Seconds 5; try { Remove-Item $f -Force -ErrorAction SilentlyContinue } catch {} } -ArgumentList $png | Out-Null
                 return $true
             }
             return $false
         }
-        
+
         $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
         $bitmap.BeginInit()
         $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
@@ -377,7 +436,7 @@ function Show-PreviewUniversal {
     )
     $lblEstadoConsulta.Text = "Obteniendo miniaturas..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Blue
-    
+
     if ($global:videoJsonData) {
         $title = $global:videoJsonData.title
         $uploader = $global:videoJsonData.uploader
@@ -402,15 +461,15 @@ function Show-PreviewUniversal {
             $bitmap.EndInit()
             $picPreview.Source = $bitmap
             if ($Titulo) { $picPreview.ToolTip = $Titulo }
-            
+
             $lblEstadoConsulta.Text = "Vista previa cargada"
             $lblEstadoConsulta.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 199, 89)))
-            
+
             Start-Job -ScriptBlock { param($f); Start-Sleep -Seconds 5; try { Remove-Item $f -Force -ErrorAction SilentlyContinue } catch {} } -ArgumentList $thumbFile | Out-Null
             return $true
         } catch {}
     }
-    
+
     $thumbList = Get-ThumbnailListFromYtDlp -Url $Url
     if ($thumbList -and $thumbList.Count -gt 0) {
         $sortedThumbs = $thumbList | Sort-Object @{Expression={$_.Width * $_.Height};Descending=$true} | Select-Object -First 3
@@ -422,13 +481,13 @@ function Show-PreviewUniversal {
             }
         }
     }
-    
+
     if ($DirectThumbUrl -and (Show-PreviewImage -ImageUrl $DirectThumbUrl -Titulo $Titulo)) {
         $lblEstadoConsulta.Text = "Vista previa cargada"
         $lblEstadoConsulta.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 199, 89)))
         return $true
     }
-    
+
     $lblEstadoConsulta.Text = "No se pudo cargar vista previa"
     $lblEstadoConsulta.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255, 149, 0)))
     return $false
@@ -445,7 +504,7 @@ function Show-UrlHistoryMenu {
     } catch {
         try { $items = @(Get-Content -LiteralPath $script:LogFile -ErrorAction Stop | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -Unique) } catch { $items = @() }
     }
-    
+
     if (-not $items -or $items.Count -eq 0) {
         $mi = New-Object System.Windows.Controls.MenuItem
         $mi.Header = "(Sin historial)"
@@ -544,18 +603,18 @@ function Show-AppInfo {
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <TextBlock Grid.Row="0" Text="YTDLL — Versión: `$version" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
-        
+
         <CheckBox Name="chkDebug" Grid.Row="1" Content="Mostrar debug en consola" Margin="0,0,0,20"/>
-        
+
         <Border Grid.Row="2" Background="White" CornerRadius="10" Padding="15">
             <Border.Effect>
                 <DropShadowEffect Color="Black" Opacity="0.05" BlurRadius="10" ShadowDepth="2"/>
             </Border.Effect>
             <StackPanel>
                 <TextBlock Text="Dependencias y herramientas necesarias" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,15"/>
-                
+
                 <!-- yt-dlp -->
                 <Grid Margin="0,5,0,15">
                     <Grid.ColumnDefinitions>
@@ -575,7 +634,7 @@ function Show-AppInfo {
                     <Button Name="btnYtRefresh" Grid.Column="2" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
                     <Button Name="btnYtUninstall" Grid.Column="3" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30" VerticalAlignment="Center"/>
                 </Grid>
-                
+
                 <!-- ffmpeg -->
                 <Grid Margin="0,5,0,15">
                     <Grid.ColumnDefinitions>
@@ -595,7 +654,7 @@ function Show-AppInfo {
                     <Button Name="btnFfmpegRefresh" Grid.Column="2" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
                     <Button Name="btnFfmpegUninstall" Grid.Column="3" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30" VerticalAlignment="Center"/>
                 </Grid>
-                
+
                 <!-- Node.js -->
                 <Grid Margin="0,5,0,15">
                     <Grid.ColumnDefinitions>
@@ -615,7 +674,7 @@ function Show-AppInfo {
                     <Button Name="btnNodeRefresh" Grid.Column="2" Content="↻ Actualizar" Style="{StaticResource ActionButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
                     <Button Name="btnNodeUninstall" Grid.Column="3" Content="✖" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Width="30" VerticalAlignment="Center"/>
                 </Grid>
-                
+
                 <!-- mpv.net -->
                 <Grid Margin="0,5,0,5">
                     <Grid.ColumnDefinitions>
@@ -637,7 +696,7 @@ function Show-AppInfo {
                 </Grid>
             </StackPanel>
         </Border>
-        
+
         <Grid Grid.Row="3" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -652,30 +711,30 @@ function Show-AppInfo {
     $reader = (New-Object System.Xml.XmlNodeReader $xamlInfo)
     $winInfo = [System.Windows.Markup.XamlReader]::Load($reader)
     $winInfo.Owner = $formPrincipal
-    
+
     $chkDebug = $winInfo.FindName("chkDebug")
-    $chkDebug.IsChecked = $script:DebugEnabled
+    $chkDebug.IsChecked = $global:DebugEnabled
     $chkDebug.add_Checked({
-        $script:DebugEnabled = $true
+        $global:DebugEnabled = $true
         Set-IniValue -Section "DEBUG" -Key "ConsoleDebug" -Value "true"
     })
     $chkDebug.add_Unchecked({
-        $script:DebugEnabled = $false
+        $global:DebugEnabled = $false
         Set-IniValue -Section "DEBUG" -Key "ConsoleDebug" -Value "false"
     })
-    
+
     $lblYtDlp = $winInfo.FindName("lblYtDlp")
     $lblFfmpeg = $winInfo.FindName("lblFfmpeg")
     $lblNode = $winInfo.FindName("lblNode")
     $lblMpvNet = $winInfo.FindName("lblMpvNet")
-    
+
     Refresh-DependencyLabel -CommandName "yt-dlp"  -FriendlyName "yt-dlp"  -LabelRef ([ref]$lblYtDlp)  -VersionArgs "--version" -Parse "FirstLine"
     Refresh-DependencyLabel -CommandName "ffmpeg"  -FriendlyName "ffmpeg"  -LabelRef ([ref]$lblFfmpeg) -VersionArgs "-version"  -Parse "FirstLine"
     if ($script:RequireNode) {
         Refresh-DependencyLabel -CommandName "node" -FriendlyName "Node.js" -LabelRef ([ref]$lblNode) -VersionArgs "--version" -Parse "FirstLine"
     }
     Refresh-DependencyLabel -CommandName "mpvnet"  -FriendlyName "mpv.net" -LabelRef ([ref]$lblMpvNet) -VersionArgs "--version" -Parse "FirstLine"
-    
+
     $winInfo.FindName("lnkYtDlp").add_MouseLeftButtonDown({ Start-Process "https://github.com/yt-dlp/yt-dlp" })
     $winInfo.FindName("lnkFfmpeg").add_MouseLeftButtonDown({ Start-Process "https://ffmpeg.org/" })
     $winInfo.FindName("lnkNode").add_MouseLeftButtonDown({ Start-Process "https://nodejs.org/" })
@@ -683,13 +742,13 @@ function Show-AppInfo {
 
     $winInfo.FindName("btnYtRefresh").add_Click({ Update-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -CommandName "yt-dlp" -LabelRef ([ref]$lblYtDlp) -VersionArgs "--version" -Parse "FirstLine" })
     $winInfo.FindName("btnYtUninstall").add_Click({ Uninstall-Dependency -ChocoPkg "yt-dlp" -FriendlyName "yt-dlp" -LabelRef ([ref]$lblYtDlp) })
-    
+
     $winInfo.FindName("btnFfmpegRefresh").add_Click({ Update-Dependency -ChocoPkg "ffmpeg" -FriendlyName "ffmpeg" -CommandName "ffmpeg" -LabelRef ([ref]$lblFfmpeg) -VersionArgs "-version" -Parse "FirstLine" })
     $winInfo.FindName("btnFfmpegUninstall").add_Click({ Uninstall-Dependency -ChocoPkg "ffmpeg" -FriendlyName "ffmpeg" -LabelRef ([ref]$lblFfmpeg) })
-    
+
     $winInfo.FindName("btnNodeRefresh").add_Click({ Update-Dependency -ChocoPkg "nodejs-lts" -FriendlyName "Node.js" -CommandName "node" -LabelRef ([ref]$lblNode) -VersionArgs "--version" -Parse "FirstLine" })
     $winInfo.FindName("btnNodeUninstall").add_Click({ Uninstall-Dependency -ChocoPkg "nodejs-lts" -FriendlyName "Node.js" -LabelRef ([ref]$lblNode) })
-    
+
     $winInfo.FindName("btnMpvNetRefresh").add_Click({
         if (-not (Ensure-DotNet6DesktopRuntime)) { return }
         Update-Dependency -ChocoPkg "mpv.net" -FriendlyName "mpv.net" -CommandName "mpvnet" -LabelRef ([ref]$lblMpvNet) -VersionArgs "--version" -Parse "FirstLine"
@@ -706,7 +765,7 @@ function Show-AppInfo {
             try { choco uninstall "Microsoft .NET 6 Desktop Runtime" -y | Out-Null } catch {}
         }
     })
-    
+
     $winInfo.FindName("btnActualizarTodo").add_Click({
         if (-not (Check-Chocolatey)) { return }
         [void](Ensure-DotNet6DesktopRuntime)
@@ -717,7 +776,7 @@ function Show-AppInfo {
         }
         Update-Dependency -ChocoPkg "mpv.net"     -FriendlyName "mpv.net" -CommandName "mpvnet"  -LabelRef ([ref]$lblMpvNet) -VersionArgs "--version" -Parse "FirstLine"
     })
-    
+
     $winInfo.FindName("btnCerrarInfo").add_Click({ $winInfo.Close() })
     $winInfo.ShowDialog() | Out-Null
 }
@@ -766,7 +825,7 @@ function Show-SitesDialog {
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <Grid Grid.Row="0" Margin="0,0,0,15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -783,7 +842,7 @@ function Show-SitesDialog {
             </TextBox>
             <TextBlock Name="lblCount" Grid.Column="1" Text="0/`$(`$allSites.Count)" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="14"/>
         </Grid>
-        
+
         <ListBox Name="lstSites" Grid.Row="1" FontFamily="Consolas" FontSize="13" BorderThickness="0" Margin="0,0,0,15">
             <ListBox.Template>
                 <ControlTemplate TargetType="ListBox">
@@ -795,7 +854,7 @@ function Show-SitesDialog {
                 </ControlTemplate>
             </ListBox.Template>
         </ListBox>
-        
+
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Name="btnCopy" Content="Copiar selección" Margin="0,0,10,0"/>
             <Button Name="btnClose" Content="Cerrar"/>
@@ -810,7 +869,7 @@ function Show-SitesDialog {
     $txtFiltro = $winSites.FindName("txtFiltro")
     $lblCount = $winSites.FindName("lblCount")
     $lstSites = $winSites.FindName("lstSites")
-    
+
     function Refresh-List([string]$term) {
         $lstSites.Items.Clear()
         $items = $allSites
@@ -821,7 +880,7 @@ function Show-SitesDialog {
         $items | ForEach-Object { [void]$lstSites.Items.Add($_) }
         $lblCount.Text = "$($lstSites.Items.Count)/$($allSites.Count)"
     }
-    
+
     Refresh-List $null
 
     $txtFiltro.add_GotFocus({
@@ -830,31 +889,31 @@ function Show-SitesDialog {
             $txtFiltro.Foreground = [System.Windows.Media.Brushes]::Black
         }
     })
-    
+
     $txtFiltro.add_LostFocus({
         if ([string]::IsNullOrWhiteSpace($txtFiltro.Text)) {
             $txtFiltro.Text = "(buscar sitio)"
             $txtFiltro.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(142, 142, 147)))
         }
     })
-    
+
     $txtFiltro.add_TextChanged({
-        if ($txtFiltro.Foreground.ToString() -ne "#FF000000") { return } 
+        if ($txtFiltro.Foreground.ToString() -ne "#FF000000") { return }
         Refresh-List $txtFiltro.Text.Trim()
     })
-    
+
     $winSites.FindName("btnCopy").add_Click({
         if ($lstSites.SelectedItem) {
             try { [System.Windows.Clipboard]::SetText([string]$lstSites.SelectedItem) } catch {}
         }
     })
-    
+
     $lstSites.add_MouseDoubleClick({
         if ($lstSites.SelectedItem) {
             try { [System.Windows.Clipboard]::SetText([string]$lstSites.SelectedItem) } catch {}
         }
     })
-    
+
     $winSites.FindName("btnClose").add_Click({ $winSites.Close() })
     $winSites.ShowDialog() | Out-Null
 }

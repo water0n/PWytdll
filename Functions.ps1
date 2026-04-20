@@ -81,7 +81,7 @@ function Set-IniValue {
 
 function Write-DebugLog {
     param([string]$Message, [string]$ForegroundColor = "Yellow")
-    if ($script:DebugEnabled) { Write-Host $Message -ForegroundColor $ForegroundColor }
+    if ($global:DebugEnabled) { Write-Host $Message -ForegroundColor $ForegroundColor }
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -897,6 +897,13 @@ function Invoke-ConsultaFromUI {
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
     $res   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Consultando video" -TimeoutSec 60
+    Write-DebugLog "[DEBUG] yt-dlp ExitCode: $($res.ExitCode)" -ForegroundColor Yellow
+    if ([string]::IsNullOrWhiteSpace($res.StdOut)) {
+        Write-DebugLog "[DEBUG] StdOut está vacío o nulo" -ForegroundColor Red
+        if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) {
+            Write-DebugLog "[DEBUG] StdErr: $($res.StdErr)" -ForegroundColor Red
+        }
+    }
     $lines = @()
     if (-not [string]::IsNullOrWhiteSpace($res.StdOut)) {
         $lines = $res.StdOut -split "`r?`n" | Where-Object { $_.Trim() -ne "" }
@@ -929,10 +936,30 @@ function Invoke-ConsultaFromUI {
     } else {
         $script:videoConsultado = $false; $script:ultimaURL = $null; $script:ultimoTitulo = $null
         $script:formatsEnumerated = $false
-        $lblEstadoConsulta.Text     = "Error al consultar la URL"
-        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
         $picPreview.Source = $null
         $btnDescargar.IsEnabled = $true; $txtUrl.IsEnabled = $true
+
+        # ── Detectar error específico de YouTube bot/cookies ───────────────────
+        $isYouTubeBot = $res.StdErr -match "Sign in to confirm" -or
+                        $res.StdErr -match "not a bot" -or
+                        $res.StdErr -match "Use --cookies"
+        if ($isYouTubeBot) {
+            $lblEstadoConsulta.Text     = "⚠ YouTube requiere autenticación — usa el botón 🍪"
+            $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkOrange
+            [System.Windows.MessageBox]::Show(
+                "YouTube detectó actividad sospechosa y pide iniciar sesión.`n`n" +
+                "Solución: haz clic en el botón 🍪 (arriba a la derecha) y elige tu navegador para extraer las cookies automáticamente.`n`n" +
+                "Si ya tienes un archivo cookies.txt, selecciona '📁 Seleccionar archivo...'",
+                "YouTube requiere cookies",
+                [System.Windows.MessageBoxButton]::OK,
+                [System.Windows.MessageBoxImage]::Warning
+            ) | Out-Null
+            Set-DownloadButtonVisual
+            return $false
+        }
+
+        $lblEstadoConsulta.Text     = "Error al consultar la URL"
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
         $errorMsg = "yt-dlp devolvió error al consultar la URL."
         if (-not [string]::IsNullOrWhiteSpace($res.StdErr)) { $errorMsg += "`n`nError: $($res.StdErr)" }
         [System.Windows.MessageBox]::Show($errorMsg, "Error en consulta", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
@@ -946,31 +973,45 @@ function Invoke-ConsultaFromUI {
 
 function Export-BrowserCookies {
     param([string]$Browser)
-    try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return $false }
-    
+    try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch {
+        [System.Windows.MessageBox]::Show("yt-dlp no está disponible.", "Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
+        return $null
+    }
+
     $tmpCookie = Join-Path $env:TEMP "ytdll_cookies_$Browser.txt"
     if (Test-Path $tmpCookie) { Remove-Item $tmpCookie -Force -ErrorAction SilentlyContinue }
 
-    $lblEstadoConsulta.Text = "Extrayendo cookies de $Browser..."
+    $lblEstadoConsulta.Text     = "Extrayendo cookies de $Browser..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
 
-    $args = @("--cookies-from-browser", $Browser, "--cookies", $tmpCookie, "--ignore-config", "--no-warnings", "https://youtube.com/robots.txt")
-    $res = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Extrayendo cookies" -TimeoutSec 120
+    Write-Host "[COOKIES] Extrayendo cookies de $Browser..." -ForegroundColor Cyan
+    # Usamos robots.txt como URL mínima para forzar la extracción sin descargar nada
+    $cookieArgs = @("--cookies-from-browser", $Browser, "--cookies", $tmpCookie,
+                    "--ignore-config", "--no-warnings",
+                    "https://www.youtube.com/robots.txt")
+    $res = Invoke-CaptureResponsive -ExePath $yt.Source -Args $cookieArgs -WorkingText "Extrayendo cookies de $Browser" -TimeoutSec 120
 
     if ($res.ExitCode -ne 0 -or -not (Test-Path $tmpCookie)) {
-        $lblEstadoConsulta.Text = "ERROR: No se pudieron extraer cookies"
+        $lblEstadoConsulta.Text     = "ERROR: No se pudieron extraer cookies de $Browser"
         $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
-        [System.Windows.MessageBox]::Show("Hubo un error extrayendo las cookies de $Browser.
-
-Por favor Cierra tu navegador y vuelve a intentarlo.
-
-Detalles: $($res.StdErr)", "Error de Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
+        Write-Host "[COOKIES] Error extrayendo cookies: $($res.StdErr)" -ForegroundColor Red
+        [System.Windows.MessageBox]::Show(
+            "No se pudieron extraer las cookies de $Browser.`n`n" +
+            "Asegúrate de:`n" +
+            "  1. Tener $Browser instalado`n" +
+            "  2. Cerrar $Browser completamente antes de intentarlo`n" +
+            "  3. Haber iniciado sesión en YouTube en ese navegador`n`n" +
+            "Detalles: $($res.StdErr)",
+            "Error de Cookies",
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        ) | Out-Null
         return $null
     }
-    
-    $lblEstadoConsulta.Text = "Cookies extraÃ­das con Ã©xito."
-    $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Green
+
+    Write-Host "[COOKIES] Cookies extraidas de $Browser -> $tmpCookie" -ForegroundColor Green
+    $lblEstadoConsulta.Text     = "Cookies de $Browser configuradas correctamente"
+    $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkGreen
     return $tmpCookie
 }
-

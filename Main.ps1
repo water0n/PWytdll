@@ -86,7 +86,7 @@ $global:defaultInstructions = @"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ── Debug desde config.ini ─────────────────────────────────────────────────────
-$script:DebugEnabled = [bool]::Parse((Get-IniValue -Section "DEBUG" -Key "ConsoleDebug" -DefaultValue "false"))
+$global:DebugEnabled = [bool]::Parse((Get-IniValue -Section "DEBUG" -Key "ConsoleDebug" -DefaultValue "false"))
 
 # ── Feature flags ─────────────────────────────────────────────────────────────
 $script:RequireNode = $true   # Cambiar a $false para no exigir Node.js
@@ -412,6 +412,3 @@ try { $txtDestino.Text = $script:ultimaRutaDescarga } catch {}
 #  MOSTRAR LA APLICACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 $formPrincipal.ShowDialog() | Out-Null
-
-
-
