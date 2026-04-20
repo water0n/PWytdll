@@ -159,12 +159,66 @@ $btnPickCookies.Add_Click({
     $ctxCookies.IsOpen = $true
 })
 
-$formPrincipal.FindName("miCookieEdge").add_Click({ $script:cookiesBrowser = "edge"; $script:cookiesPath = $null; Set-IniValue -Section "cookies" -Key "Browser" -Value "edge"; Set-IniValue -Section "cookies" -Key "Path" -Value ""; [System.Windows.MessageBox]::Show("Cookies: Navegador Edge seleccionado y guardado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
-$formPrincipal.FindName("miCookieChrome").add_Click({ $script:cookiesBrowser = "chrome"; $script:cookiesPath = $null; Set-IniValue -Section "cookies" -Key "Browser" -Value "chrome"; Set-IniValue -Section "cookies" -Key "Path" -Value ""; [System.Windows.MessageBox]::Show("Cookies: Navegador Chrome seleccionado y guardado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
-$formPrincipal.FindName("miCookieFirefox").add_Click({ $script:cookiesBrowser = "firefox"; $script:cookiesPath = $null; Set-IniValue -Section "cookies" -Key "Browser" -Value "firefox"; Set-IniValue -Section "cookies" -Key "Path" -Value ""; [System.Windows.MessageBox]::Show("Cookies: Navegador Firefox seleccionado y guardado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
-$formPrincipal.FindName("miCookieBrave").add_Click({ $script:cookiesBrowser = "brave"; $script:cookiesPath = $null; Set-IniValue -Section "cookies" -Key "Browser" -Value "brave"; Set-IniValue -Section "cookies" -Key "Path" -Value ""; [System.Windows.MessageBox]::Show("Cookies: Navegador Brave seleccionado y guardado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
-$formPrincipal.FindName("miCookieOpera").add_Click({ $script:cookiesBrowser = "opera"; $script:cookiesPath = $null; Set-IniValue -Section "cookies" -Key "Browser" -Value "opera"; Set-IniValue -Section "cookies" -Key "Path" -Value ""; [System.Windows.MessageBox]::Show("Cookies: Navegador Opera seleccionado y guardado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
-$formPrincipal.FindName("miCookieVivaldi").add_Click({ $script:cookiesBrowser = "vivaldi"; $script:cookiesPath = $null; Set-IniValue -Section "cookies" -Key "Browser" -Value "vivaldi"; Set-IniValue -Section "cookies" -Key "Path" -Value ""; [System.Windows.MessageBox]::Show("Cookies: Navegador Vivaldi seleccionado y guardado.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null })
+$formPrincipal.FindName("miCookieEdge").add_Click({
+    $res = Export-BrowserCookies -Browser "edge"
+    if ($res) {
+        $script:cookiesPath = $res
+        $script:cookiesBrowser = $null
+        Set-IniValue -Section "cookies" -Key "Browser" -Value "edge"
+        Set-IniValue -Section "cookies" -Key "Path" -Value $res
+        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Edge exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    }
+})
+$formPrincipal.FindName("miCookieChrome").add_Click({
+    $res = Export-BrowserCookies -Browser "chrome"
+    if ($res) {
+        $script:cookiesPath = $res
+        $script:cookiesBrowser = $null
+        Set-IniValue -Section "cookies" -Key "Browser" -Value "chrome"
+        Set-IniValue -Section "cookies" -Key "Path" -Value $res
+        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Chrome exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    }
+})
+$formPrincipal.FindName("miCookieFirefox").add_Click({
+    $res = Export-BrowserCookies -Browser "firefox"
+    if ($res) {
+        $script:cookiesPath = $res
+        $script:cookiesBrowser = $null
+        Set-IniValue -Section "cookies" -Key "Browser" -Value "firefox"
+        Set-IniValue -Section "cookies" -Key "Path" -Value $res
+        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Firefox exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    }
+})
+$formPrincipal.FindName("miCookieBrave").add_Click({
+    $res = Export-BrowserCookies -Browser "brave"
+    if ($res) {
+        $script:cookiesPath = $res
+        $script:cookiesBrowser = $null
+        Set-IniValue -Section "cookies" -Key "Browser" -Value "brave"
+        Set-IniValue -Section "cookies" -Key "Path" -Value $res
+        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Brave exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    }
+})
+$formPrincipal.FindName("miCookieOpera").add_Click({
+    $res = Export-BrowserCookies -Browser "opera"
+    if ($res) {
+        $script:cookiesPath = $res
+        $script:cookiesBrowser = $null
+        Set-IniValue -Section "cookies" -Key "Browser" -Value "opera"
+        Set-IniValue -Section "cookies" -Key "Path" -Value $res
+        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Opera exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    }
+})
+$formPrincipal.FindName("miCookieVivaldi").add_Click({
+    $res = Export-BrowserCookies -Browser "vivaldi"
+    if ($res) {
+        $script:cookiesPath = $res
+        $script:cookiesBrowser = $null
+        Set-IniValue -Section "cookies" -Key "Browser" -Value "vivaldi"
+        Set-IniValue -Section "cookies" -Key "Path" -Value $res
+        [System.Windows.MessageBox]::Show("Cookies extraÃ­das de Vivaldi exitosamente.", "Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    }
+})
 
 $formPrincipal.FindName("miCookieFile").add_Click({
     $ofd = New-Object System.Windows.Forms.OpenFileDialog
@@ -359,4 +413,5 @@ try { $txtDestino.Text = $script:ultimaRutaDescarga } catch {}
 #  MOSTRAR LA APLICACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 $formPrincipal.ShowDialog() | Out-Null
+
 

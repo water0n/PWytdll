@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     YTDLL — Módulo de Funciones
     Lógica de negocio: configuración, historial, formatos de video/audio,
@@ -390,7 +390,7 @@ function Invoke-CaptureResponsive {
             if ($lblEstadoConsulta) { $lblEstadoConsulta.Text = $WorkingText + ("." * $dot) }
             if ($sw.Elapsed.TotalSeconds -ge $TimeoutSec) {
                 try { $proc.Kill() } catch {}
-                throw "Tiempo de espera agotado ($TimeoutSec s) en '$WorkingText'."
+                return [pscustomobject]@{ ExitCode = -1; StdOut = ""; StdErr = "Tiempo de espera agotado ($TimeoutSec s) en '$WorkingText'." }
             }
             Start-Sleep -Milliseconds 120
         }
@@ -789,10 +789,10 @@ function Fetch-Formats {
     if ($script:cookiesBrowser)           { $args1 += @("--cookies-from-browser", $script:cookiesBrowser) }
     elseif ($script:cookiesPath)          { $args1 += @("--cookies",$script:cookiesPath) }
     $args1 += $Url
-    $obj   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Obteniendo formatos" -TimeoutSec 30
+    $obj   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Obteniendo formatos" -TimeoutSec 60
     if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
         $lblEstadoConsulta.Text = "Reintentando obtención de formatos..."
-        $obj = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Reintentando formatos" -TimeoutSec 30
+        $obj = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args1 -WorkingText "Reintentando formatos" -TimeoutSec 60
         if (($obj.ExitCode -ne 0 -and $obj.ExitCode -ne $null) -or [string]::IsNullOrWhiteSpace($obj.StdOut)) {
             $lblEstadoConsulta.Text     = "ERROR: No se pudieron obtener formatos"
             $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
@@ -902,7 +902,7 @@ function Invoke-ConsultaFromUI {
     $lblEstadoConsulta.Text     = "Consultando video..."
     $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
     try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
-    $res   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Consultando video" -TimeoutSec 30
+    $res   = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Consultando video" -TimeoutSec 60
     $lines = @()
     if (-not [string]::IsNullOrWhiteSpace($res.StdOut)) {
         $lines = $res.StdOut -split "`r?`n" | Where-Object { $_.Trim() -ne "" }
@@ -948,3 +948,34 @@ function Invoke-ConsultaFromUI {
 }
 
 
+
+
+function Export-BrowserCookies {
+    param([string]$Browser)
+    try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch { return $false }
+    
+    $tmpCookie = Join-Path $env:TEMP "ytdll_cookies_$Browser.txt"
+    if (Test-Path $tmpCookie) { Remove-Item $tmpCookie -Force -ErrorAction SilentlyContinue }
+
+    $lblEstadoConsulta.Text = "Extrayendo cookies de $Browser..."
+    $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkBlue
+    try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background) } catch {}
+
+    $args = @("--cookies-from-browser", $Browser, "--cookies", $tmpCookie, "--ignore-config", "--no-warnings", "https://youtube.com/robots.txt")
+    $res = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Extrayendo cookies" -TimeoutSec 120
+
+    if ($res.ExitCode -ne 0 -or -not (Test-Path $tmpCookie)) {
+        $lblEstadoConsulta.Text = "ERROR: No se pudieron extraer cookies"
+        $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
+        [System.Windows.MessageBox]::Show("Hubo un error extrayendo las cookies de $Browser.
+
+Por favor Cierra tu navegador y vuelve a intentarlo.
+
+Detalles: $($res.StdErr)", "Error de Cookies", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
+        return $null
+    }
+    
+    $lblEstadoConsulta.Text = "Cookies extraÃ­das con Ã©xito."
+    $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Green
+    return $tmpCookie
+}
