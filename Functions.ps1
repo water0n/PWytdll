@@ -983,6 +983,792 @@ function Invoke-ConsultaFromUI {
     }
 }
 
+function Get-QueueBool {
+    param([string]$Value, [bool]$Default = $false)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $Default }
+    return ($Value -match '^(1|true|yes|si|sí)$')
+}
+
+function Ensure-QueueProperty {
+    param($Item, [string]$Name, $DefaultValue)
+    if (-not $Item.PSObject.Properties[$Name]) {
+        $Item | Add-Member -MemberType NoteProperty -Name $Name -Value $DefaultValue
+    }
+}
+
+function Initialize-QueueItemShape {
+    param($Item)
+    Ensure-QueueProperty -Item $Item -Name "Id" -DefaultValue ([guid]::NewGuid().ToString())
+    Ensure-QueueProperty -Item $Item -Name "Url" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "Title" -DefaultValue "Video"
+    Ensure-QueueProperty -Item $Item -Name "ThumbUrl" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "Destination" -DefaultValue $script:ultimaRutaDescarga
+    Ensure-QueueProperty -Item $Item -Name "FormatSelector" -DefaultValue "bestvideo+bestaudio/best"
+    Ensure-QueueProperty -Item $Item -Name "MergeExt" -DefaultValue "mp4"
+    Ensure-QueueProperty -Item $Item -Name "VideoFormatId" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "AudioFormatId" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "VideoFormatLabel" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "AudioFormatLabel" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "SizeText" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "NoPlaylist" -DefaultValue $true
+    Ensure-QueueProperty -Item $Item -Name "BestProgId" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "Status" -DefaultValue "Waiting"
+    Ensure-QueueProperty -Item $Item -Name "Phase" -DefaultValue "En espera"
+    Ensure-QueueProperty -Item $Item -Name "Percent" -DefaultValue 0
+    Ensure-QueueProperty -Item $Item -Name "Speed" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "Eta" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "TargetPath" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "ExitCode" -DefaultValue $null
+    Ensure-QueueProperty -Item $Item -Name "CreatedAt" -DefaultValue ([DateTime]::Now.ToString("o"))
+    Ensure-QueueProperty -Item $Item -Name "StartedAt" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "CompletedAt" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "StartRequested" -DefaultValue $false
+    Ensure-QueueProperty -Item $Item -Name "CancelRequested" -DefaultValue $false
+    Ensure-QueueProperty -Item $Item -Name "Process" -DefaultValue $null
+    Ensure-QueueProperty -Item $Item -Name "StdoutPath" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "StderrPath" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "StdoutReader" -DefaultValue $null
+    Ensure-QueueProperty -Item $Item -Name "StderrReader" -DefaultValue $null
+    Ensure-QueueProperty -Item $Item -Name "StdoutStream" -DefaultValue $null
+    Ensure-QueueProperty -Item $Item -Name "StderrStream" -DefaultValue $null
+    Ensure-QueueProperty -Item $Item -Name "LastOutFragment" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "LastErrFragment" -DefaultValue ""
+    if ($Item.Status -in @("Running","Canceling")) {
+        $Item.Status = "Waiting"
+        $Item.Phase = "En espera"
+        $Item.Percent = 0
+        $Item.StartRequested = $false
+    }
+    $Item.Process = $null
+    $Item.StdoutReader = $null
+    $Item.StderrReader = $null
+    $Item.StdoutStream = $null
+    $Item.StderrStream = $null
+    $Item.CancelRequested = $false
+    return $Item
+}
+
+function Load-DownloadQueue {
+    if (-not $script:downloadQueue) {
+        $script:downloadQueue = New-Object System.Collections.ArrayList
+    }
+    $script:downloadQueue.Clear()
+    $raw = Get-IniValue -Section "queue" -Key "ItemsBase64" -DefaultValue ""
+    if ([string]::IsNullOrWhiteSpace($raw)) { return }
+    try {
+        $json = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($raw))
+        $items = @($json | ConvertFrom-Json)
+        foreach ($item in $items) {
+            if ($null -eq $item) { continue }
+            [void]$script:downloadQueue.Add((Initialize-QueueItemShape -Item $item))
+        }
+    } catch {
+        Write-Host "[QUEUE] No se pudo restaurar la cola guardada: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+function Save-DownloadQueue {
+    if (-not $script:downloadQueue) { return }
+    try {
+        $items = @()
+        foreach ($item in $script:downloadQueue) {
+            $status = if ($item.Status -eq "Running") { "Waiting" } else { $item.Status }
+            $percent = if ($status -eq "Completed") { 100 } else { [int]($item.Percent) }
+            if ($status -eq "Waiting") { $percent = 0 }
+            $items += [pscustomobject]@{
+                Id               = $item.Id
+                Url              = $item.Url
+                Title            = $item.Title
+                ThumbUrl         = $item.ThumbUrl
+                Destination      = $item.Destination
+                FormatSelector   = $item.FormatSelector
+                MergeExt         = $item.MergeExt
+                VideoFormatId    = $item.VideoFormatId
+                AudioFormatId    = $item.AudioFormatId
+                VideoFormatLabel = $item.VideoFormatLabel
+                AudioFormatLabel = $item.AudioFormatLabel
+                SizeText         = $item.SizeText
+                NoPlaylist       = [bool]$item.NoPlaylist
+                BestProgId       = $item.BestProgId
+                Status           = $status
+                Phase            = if ($status -eq "Completed") { "Completado" } else { "En espera" }
+                Percent          = $percent
+                Speed            = ""
+                Eta              = ""
+                TargetPath       = if ($status -eq "Completed") { $item.TargetPath } else { "" }
+                ExitCode         = $item.ExitCode
+                CreatedAt        = $item.CreatedAt
+                StartedAt        = $item.StartedAt
+                CompletedAt      = $item.CompletedAt
+                StartRequested   = $false
+            }
+        }
+        $json = if ($items.Count -gt 0) { $items | ConvertTo-Json -Compress -Depth 6 } else { "[]" }
+        $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($json))
+        Set-IniValue -Section "queue" -Key "ItemsBase64" -Value $b64
+    } catch {
+        Write-Host "[QUEUE] Error guardando cola: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+function Save-DownloadQueueSettings {
+    Set-IniValue -Section "queue" -Key "AutoDownload" -Value ([string]$script:queueAutoDownload).ToLower()
+    Set-IniValue -Section "queue" -Key "MaxConcurrent" -Value ([string]$script:queueMaxConcurrent)
+    Set-IniValue -Section "queue" -Key "PanelExpanded" -Value ([string]$script:queuePanelExpanded).ToLower()
+}
+
+function Get-QueueMaxConcurrent {
+    if (-not $cmbMaxConcurrent -or -not $cmbMaxConcurrent.SelectedItem) { return [int]$script:queueMaxConcurrent }
+    $raw = $cmbMaxConcurrent.SelectedItem
+    if ($raw -is [System.Windows.Controls.ComboBoxItem]) { $raw = $raw.Content }
+    $value = 2
+    if ([int]::TryParse([string]$raw, [ref]$value)) {
+        return [Math]::Max(1, [Math]::Min(5, $value))
+    }
+    return 2
+}
+
+function Set-QueuePanelExpanded {
+    param([bool]$Expanded, [switch]$SkipSave)
+    $script:queuePanelExpanded = $Expanded
+    if ($QueuePanel -and $queueColumn -and $btnQueueToggle -and $formPrincipal) {
+        if ($Expanded) {
+            $QueuePanel.Visibility = [System.Windows.Visibility]::Visible
+            $queueColumn.Width = New-Object System.Windows.GridLength(420)
+            $btnQueueToggle.Content = "«"
+            $formPrincipal.Width = 920
+        } else {
+            $QueuePanel.Visibility = [System.Windows.Visibility]::Collapsed
+            $queueColumn.Width = New-Object System.Windows.GridLength(0)
+            $btnQueueToggle.Content = "»"
+            $formPrincipal.Width = 500
+        }
+    }
+    if (-not $SkipSave) { Save-DownloadQueueSettings }
+}
+
+function Get-QueueItemById {
+    param([Parameter(Mandatory=$true)][string]$Id)
+    if (-not $script:downloadQueue) { return $null }
+    return ($script:downloadQueue | Where-Object { $_.Id -eq $Id } | Select-Object -First 1)
+}
+
+function Get-QueueFormatSelection {
+    $videoSel = Get-SelectedFormatId -Combo $cmbVideoFmt
+    $audioSel = Get-SelectedFormatId -Combo $cmbAudioFmt
+    $hayFormatosAudio = ($script:formatsAudio -and $script:formatsAudio.Count -gt 0)
+    $mergeExt = $null
+
+    if ($videoSel -and $audioSel) {
+        $selector = "{0}+{1}" -f $videoSel, $audioSel
+        $mergeExt = "mp4"
+    } elseif ($videoSel -and $hayFormatosAudio) {
+        $selector = "{0}+bestaudio" -f $videoSel
+        $mergeExt = "mp4"
+    } elseif ($videoSel) {
+        $selector = $videoSel
+    } elseif ($audioSel) {
+        $selector = $audioSel
+    } else {
+        if ($hayFormatosAudio) {
+            $selector = "bestvideo+bestaudio/best"
+            $mergeExt = "mp4"
+        } else {
+            $selector = "best"
+        }
+    }
+
+    $size = 0
+    foreach ($id in @($videoSel, $audioSel)) {
+        if ($id -and $script:formatsIndex.ContainsKey($id) -and $script:formatsIndex[$id].Filesize) {
+            $size += [double]$script:formatsIndex[$id].Filesize
+        }
+    }
+
+    return [pscustomobject]@{
+        Selector   = $selector
+        MergeExt   = $mergeExt
+        VideoId    = if ($videoSel) { $videoSel } else { "" }
+        AudioId    = if ($audioSel) { $audioSel } else { "" }
+        VideoLabel = if ($cmbVideoFmt -and $cmbVideoFmt.SelectedItem) { [string]$cmbVideoFmt.SelectedItem } else { "" }
+        AudioLabel = if ($cmbAudioFmt -and $cmbAudioFmt.SelectedItem) { [string]$cmbAudioFmt.SelectedItem } else { "" }
+        SizeText   = if ($size -gt 0) { Human-Size $size } else { "" }
+    }
+}
+
+function Add-CurrentDownloadToQueue {
+    Refresh-GateByDeps
+    $currentUrl = Get-CurrentUrl
+    $ready = $script:videoConsultado -and
+             -not [string]::IsNullOrWhiteSpace($script:ultimaURL) -and
+             ($script:ultimaURL -eq $currentUrl) -and
+             $script:formatsEnumerated
+    if (-not $ready) { return $false }
+
+    $dest = $script:ultimaRutaDescarga
+    if ([string]::IsNullOrWhiteSpace($dest)) {
+        $dest = [Environment]::GetFolderPath('Desktop')
+        $script:ultimaRutaDescarga = $dest
+        try { $txtDestino.Text = $dest } catch {}
+    }
+    if (-not (Test-Path -LiteralPath $dest)) {
+        try { New-Item -ItemType Directory -Path $dest -Force | Out-Null } catch {
+            [System.Windows.MessageBox]::Show("No se pudo preparar la carpeta de destino.", "Error de destino", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
+            return $false
+        }
+    }
+
+    $fmt = Get-QueueFormatSelection
+    $noPlaylist = $false
+    foreach ($u in @($script:originalUrl, $script:ultimaURL)) {
+        if (-not [string]::IsNullOrWhiteSpace($u) -and (Test-YouTubePlaylist -Url $u)) {
+            $noPlaylist = $true
+            break
+        }
+    }
+
+    $item = [pscustomobject]@{
+        Id               = [guid]::NewGuid().ToString()
+        Url              = $script:ultimaURL
+        Title            = if ($script:ultimoTitulo) { $script:ultimoTitulo } else { "Video" }
+        ThumbUrl         = if ($script:lastThumbUrl) { $script:lastThumbUrl } else { "" }
+        Destination      = $dest
+        FormatSelector   = $fmt.Selector
+        MergeExt         = $fmt.MergeExt
+        VideoFormatId    = $fmt.VideoId
+        AudioFormatId    = $fmt.AudioId
+        VideoFormatLabel = $fmt.VideoLabel
+        AudioFormatLabel = $fmt.AudioLabel
+        SizeText         = $fmt.SizeText
+        NoPlaylist       = ($script:isPlaylist -or $noPlaylist)
+        BestProgId       = if ($script:bestProgId) { $script:bestProgId } else { "" }
+        Status           = "Waiting"
+        Phase            = "En espera"
+        Percent          = 0
+        Speed            = ""
+        Eta              = ""
+        TargetPath       = ""
+        ExitCode         = $null
+        CreatedAt        = [DateTime]::Now.ToString("o")
+        StartedAt        = ""
+        CompletedAt      = ""
+        StartRequested   = [bool]$script:queueAutoDownload
+        CancelRequested  = $false
+        Process          = $null
+        StdoutPath       = ""
+        StderrPath       = ""
+        StdoutReader     = $null
+        StderrReader     = $null
+        StdoutStream     = $null
+        StderrStream     = $null
+        LastOutFragment  = ""
+        LastErrFragment  = ""
+    }
+    if (-not $script:downloadQueue) { $script:downloadQueue = New-Object System.Collections.ArrayList }
+    [void]$script:downloadQueue.Add($item)
+    Add-HistoryUrl -Url $script:ultimaURL
+    Save-DownloadQueue
+    Set-QueuePanelExpanded -Expanded $true
+    Refresh-QueuePanel
+    Start-NextQueuedDownloads
+    $lblEstadoConsulta.Text = if ($script:queueAutoDownload) { "Agregado a cola e iniciando..." } else { "Agregado a cola" }
+    $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::DarkGreen
+    return $true
+}
+
+function New-QueueTargetPath {
+    param($Item)
+    $dest = if ([string]::IsNullOrWhiteSpace($Item.Destination)) { $script:ultimaRutaDescarga } else { $Item.Destination }
+    if ([string]::IsNullOrWhiteSpace($dest)) { $dest = [Environment]::GetFolderPath('Desktop') }
+    if (-not (Test-Path -LiteralPath $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }
+
+    $baseTitle = Get-SafeFileName -Name $Item.Title
+    $finalExt = if ([string]::IsNullOrWhiteSpace($Item.MergeExt)) { "mp4" } else { $Item.MergeExt }
+    $idx = 1
+    do {
+        $suffix = if ($idx -eq 1) { "" } else { "_$idx" }
+        $candidate = Join-Path $dest ("{0}{1}.{2}" -f $baseTitle, $suffix, $finalExt)
+        $reserved = @($script:downloadQueue | Where-Object {
+            $_.Id -ne $Item.Id -and $_.TargetPath -and $_.TargetPath -eq $candidate -and $_.Status -in @("Running","Waiting")
+        }).Count -gt 0
+        $exists = Test-Path -LiteralPath $candidate
+        $idx++
+    } while ($exists -or $reserved)
+    return $candidate
+}
+
+function Join-YtdllArgumentList {
+    param([string[]]$Args)
+    return (($Args | ForEach-Object {
+        $s = [string]$_
+        if ($s -match '[\s"]') { '"' + ($s -replace '"','\"') + '"' } else { $s }
+    }) -join ' ')
+}
+
+function Start-QueuedDownload {
+    param($Item)
+    if (-not $Item -or $Item.Status -eq "Running") { return $false }
+    try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch {
+        $Item.Status = "Failed"
+        $Item.Phase = "yt-dlp no disponible"
+        $Item.StartRequested = $false
+        return $false
+    }
+
+    try {
+        $targetPath = New-QueueTargetPath -Item $Item
+        $Item.TargetPath = $targetPath
+        $args = @("--encoding","utf-8","--progress","--no-color","--newline","-f",$Item.FormatSelector)
+        if ($Item.NoPlaylist) { $args += "--no-playlist" }
+        if (-not [string]::IsNullOrWhiteSpace($Item.MergeExt)) {
+            $args += @("--merge-output-format", $Item.MergeExt)
+        }
+        $args += @(
+            "-o", $targetPath,
+            "--progress-template", "download:%(progress._percent_str)s ETA:%(progress._eta_str)s SPEED:%(progress._speed_str)s"
+        )
+        $args += Get-JsRuntimeArgs
+        $args += Get-ActiveCookiesArgs
+        $args += Get-YouTubeExtractorArgs -Url $Item.Url
+        $args += @("--no-part","--ignore-config", $Item.Url, "--retries","5","--retry-sleep","2","-N","4")
+
+        $tmpDir = [System.IO.Path]::GetTempPath()
+        $Item.StdoutPath = Join-Path $tmpDir ("ytdll-queue-out_{0}.log" -f $Item.Id)
+        $Item.StderrPath = Join-Path $tmpDir ("ytdll-queue-err_{0}.log" -f $Item.Id)
+        Remove-Item -LiteralPath $Item.StdoutPath, $Item.StderrPath -Force -ErrorAction SilentlyContinue
+
+        $argLine = Join-YtdllArgumentList -Args $args
+        $proc = Start-Process -FilePath $yt.Source -ArgumentList $argLine -NoNewWindow -PassThru `
+            -RedirectStandardOutput $Item.StdoutPath -RedirectStandardError $Item.StderrPath
+
+        $Item.StdoutStream = [System.IO.File]::Open($Item.StdoutPath,[System.IO.FileMode]::OpenOrCreate,[System.IO.FileAccess]::Read,[System.IO.FileShare]::ReadWrite)
+        $Item.StderrStream = [System.IO.File]::Open($Item.StderrPath,[System.IO.FileMode]::OpenOrCreate,[System.IO.FileAccess]::Read,[System.IO.FileShare]::ReadWrite)
+        $Item.StdoutReader = New-Object System.IO.StreamReader($Item.StdoutStream)
+        $Item.StderrReader = New-Object System.IO.StreamReader($Item.StderrStream)
+        $Item.Process = $proc
+        $Item.Status = "Running"
+        $Item.Phase = "Preparando..."
+        $Item.Percent = 0
+        $Item.Speed = ""
+        $Item.Eta = ""
+        $Item.StartedAt = [DateTime]::Now.ToString("o")
+        $Item.CompletedAt = ""
+        $Item.ExitCode = $null
+        $Item.StartRequested = $false
+        $Item.CancelRequested = $false
+        Write-Host ("[QUEUE] Iniciada descarga: {0}" -f $Item.Title) -ForegroundColor Cyan
+        Save-DownloadQueue
+        return $true
+    } catch {
+        Close-QueueProcessResources -Item $Item
+        foreach ($logPath in @($Item.StdoutPath, $Item.StderrPath)) {
+            if (-not [string]::IsNullOrWhiteSpace($logPath)) {
+                Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+        $Item.Status = "Failed"
+        $Item.Phase = "No se pudo iniciar"
+        $Item.StartRequested = $false
+        Write-Host "[QUEUE] Error iniciando descarga: $($_.Exception.Message)" -ForegroundColor Red
+        Save-DownloadQueue
+        return $false
+    }
+}
+
+function Update-QueueProgressFromLine {
+    param($Item, [string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return }
+    if ($Text -match 'Sleeping\s+(\d+(?:\.\d+)?)\s+seconds') { $Item.Phase = "Esperando $($Matches[1])s"; return }
+    if ($Text -match '^\[download\]\s+Destination:') { $Item.Phase = "Descargando"; return }
+    if ($Text -match '^\[Merger\]\s+Merging formats') { $Item.Phase = "Fusionando"; return }
+    if ($Text -match '^Deleting original file') { $Item.Phase = "Borrando temporales"; return }
+    if ($Text -match '^\[(ExtractAudio|Fixup|EmbedSubtitle|ModifyChapters)\]') { $Item.Phase = "Post-procesando"; return }
+
+    $m = [regex]::Match($Text, 'download:\s*(?<pct>\d+(?:\.\d+)?)%\s*(?:ETA:(?<eta>\S+))?\s*(?:SPEED:(?<spd>.+))?', 'IgnoreCase')
+    if (-not $m.Success) { $m = [regex]::Match($Text, '(?<pct>\d+(?:\.\d+)?)%\s+of.*?at\s+(?<spd>\S+)\s+ETA\s+(?<eta>\S+)', 'IgnoreCase') }
+    if (-not $m.Success) { $m = [regex]::Match($Text, '(?<pct>\d+(?:\.\d+)?)%') }
+    if ($m.Success) {
+        $Item.Percent = [int][math]::Min(100,[math]::Round([double]$m.Groups['pct'].Value))
+        $Item.Eta = $m.Groups['eta'].Value
+        $Item.Speed = ($m.Groups['spd'].Value).Trim()
+        if ([string]::IsNullOrWhiteSpace($Item.Phase) -or $Item.Phase -eq "Preparando...") { $Item.Phase = "Descargando" }
+    }
+}
+
+function Read-QueueProcessOutput {
+    param($Item)
+    foreach ($kind in @("Out","Err")) {
+        $readerProp = if ($kind -eq "Out") { "StdoutReader" } else { "StderrReader" }
+        $fragProp = if ($kind -eq "Out") { "LastOutFragment" } else { "LastErrFragment" }
+        $reader = $Item.$readerProp
+        if (-not $reader) { continue }
+        $chunk = $reader.ReadToEnd()
+        if ([string]::IsNullOrEmpty($chunk)) { continue }
+        $text = [string]$Item.$fragProp + $chunk
+        $parts = [regex]::Split($text, "\r\n|\n|\r")
+        for ($i = 0; $i -lt $parts.Length - 1; $i++) {
+            Update-QueueProgressFromLine -Item $Item -Text $parts[$i]
+        }
+        $Item.$fragProp = $parts[$parts.Length - 1]
+    }
+}
+
+function Close-QueueProcessResources {
+    param($Item)
+    try { if ($Item.StdoutReader) { $Item.StdoutReader.Close() } } catch {}
+    try { if ($Item.StderrReader) { $Item.StderrReader.Close() } } catch {}
+    try { if ($Item.StdoutStream) { $Item.StdoutStream.Close() } } catch {}
+    try { if ($Item.StderrStream) { $Item.StderrStream.Close() } } catch {}
+    try { if ($Item.Process) { $Item.Process.Dispose() } } catch {}
+    $Item.StdoutReader = $null
+    $Item.StderrReader = $null
+    $Item.StdoutStream = $null
+    $Item.StderrStream = $null
+    $Item.Process = $null
+}
+
+function Complete-QueuedDownload {
+    param($Item)
+    Read-QueueProcessOutput -Item $Item
+    foreach ($fragment in @($Item.LastOutFragment, $Item.LastErrFragment)) {
+        if (-not [string]::IsNullOrWhiteSpace($fragment)) {
+            Update-QueueProgressFromLine -Item $Item -Text $fragment
+        }
+    }
+    $Item.LastOutFragment = ""
+    $Item.LastErrFragment = ""
+    $exit = $null
+    try { $exit = $Item.Process.ExitCode } catch {}
+    $Item.ExitCode = $exit
+    Close-QueueProcessResources -Item $Item
+
+    if ($Item.CancelRequested) {
+        $Item.Status = "Cancelled"
+        $Item.Phase = "Cancelada"
+        $Item.Percent = 0
+        $Item.StartRequested = $false
+        if ($Item.TargetPath) { Remove-Item -LiteralPath $Item.TargetPath -Force -ErrorAction SilentlyContinue }
+        Write-Host ("[QUEUE] Cancelada: {0}" -f $Item.Title) -ForegroundColor Yellow
+    } elseif ($exit -eq 0 -or ($Item.TargetPath -and (Test-Path -LiteralPath $Item.TargetPath))) {
+        $Item.Status = "Completed"
+        $Item.Phase = "Completado"
+        $Item.Percent = 100
+        $Item.Speed = ""
+        $Item.Eta = ""
+        $Item.CompletedAt = [DateTime]::Now.ToString("o")
+        $oldTitle = $script:ultimoTitulo
+        try {
+            $script:ultimoTitulo = $Item.Title
+            Add-HistoryUrl -Url $Item.Url
+        } finally {
+            $script:ultimoTitulo = $oldTitle
+        }
+        Write-Host ("[QUEUE] Completada: {0}" -f $Item.Title) -ForegroundColor Green
+    } else {
+        $Item.Status = "Failed"
+        $Item.Phase = "Error"
+        $Item.StartRequested = $false
+        if ($Item.TargetPath) { Remove-Item -LiteralPath $Item.TargetPath -Force -ErrorAction SilentlyContinue }
+        Write-Host ("[QUEUE] Error: {0} ExitCode={1}" -f $Item.Title, $exit) -ForegroundColor Red
+    }
+    Remove-Item -LiteralPath $Item.StdoutPath, $Item.StderrPath -Force -ErrorAction SilentlyContinue
+    Save-DownloadQueue
+}
+
+function Monitor-ActiveDownloads {
+    if (-not $script:downloadQueue) { return }
+    foreach ($item in @($script:downloadQueue | Where-Object { $_.Status -eq "Running" })) {
+        Read-QueueProcessOutput -Item $item
+        if ($item.Process -and $item.Process.HasExited) {
+            Complete-QueuedDownload -Item $item
+        }
+    }
+}
+
+function Start-NextQueuedDownloads {
+    if (-not $script:downloadQueue) { return }
+    $max = [int]$script:queueMaxConcurrent
+    if ($max -lt 1) { $max = 1 }
+    while (@($script:downloadQueue | Where-Object { $_.Status -eq "Running" }).Count -lt $max) {
+        $next = ($script:downloadQueue | Where-Object {
+            $_.Status -eq "Waiting" -and $_.StartRequested
+        } | Select-Object -First 1)
+        if (-not $next) { break }
+        [void](Start-QueuedDownload -Item $next)
+        if ($next.Status -ne "Running") { break }
+    }
+    Refresh-QueuePanel
+}
+
+function Request-QueueItemStart {
+    param([Parameter(Mandatory=$true)][string]$Id)
+    $item = Get-QueueItemById -Id $Id
+    if (-not $item) { return }
+    if ($item.Status -eq "Running") { return }
+    if ($item.Status -in @("Failed","Cancelled")) {
+        $item.Status = "Waiting"
+        $item.Phase = "En espera"
+        $item.Percent = 0
+        $item.Speed = ""
+        $item.Eta = ""
+        $item.TargetPath = ""
+    }
+    $item.StartRequested = $true
+    Save-DownloadQueue
+    Start-NextQueuedDownloads
+    Refresh-QueuePanel
+}
+
+function Cancel-QueueItem {
+    param([Parameter(Mandatory=$true)][string]$Id)
+    $item = Get-QueueItemById -Id $Id
+    if (-not $item) { return }
+    if ($item.Status -eq "Running") {
+        $item.CancelRequested = $true
+        $item.StartRequested = $false
+        $item.Phase = "Cancelando"
+        try {
+            if ($item.Process -and -not $item.Process.HasExited) { $item.Process.Kill() }
+        } catch {}
+    } else {
+        [void]$script:downloadQueue.Remove($item)
+    }
+    Save-DownloadQueue
+    Refresh-QueuePanel
+}
+
+function Remove-QueueItem {
+    param([Parameter(Mandatory=$true)][string]$Id)
+    $item = Get-QueueItemById -Id $Id
+    if (-not $item) { return }
+    if ($item.Status -eq "Running") { Cancel-QueueItem -Id $Id; return }
+    [void]$script:downloadQueue.Remove($item)
+    Save-DownloadQueue
+    Refresh-QueuePanel
+}
+
+function Clear-CompletedQueueItems {
+    if (-not $script:downloadQueue) { return }
+    foreach ($item in @($script:downloadQueue | Where-Object { $_.Status -eq "Completed" })) {
+        [void]$script:downloadQueue.Remove($item)
+    }
+    Save-DownloadQueue
+    Refresh-QueuePanel
+}
+
+function Add-QueuePlaceholder {
+    param($Panel, [string]$Text)
+    if (-not $Panel) { return }
+    $tb = New-Object System.Windows.Controls.TextBlock
+    $tb.Text = $Text
+    $tb.FontSize = 12
+    $tb.Foreground = [System.Windows.Media.Brushes]::Gray
+    $tb.Margin = New-Object System.Windows.Thickness(0,0,0,8)
+    [void]$Panel.Children.Add($tb)
+}
+
+function Get-QueueStatusLabel {
+    param($Item)
+    switch ($Item.Status) {
+        "Running" { return $Item.Phase }
+        "Completed" { return "Completado" }
+        "Failed" { return "Error" }
+        "Cancelled" { return "Cancelada" }
+        default { if ($Item.StartRequested) { return "En cola" } else { return "En espera" } }
+    }
+}
+
+function New-QueueItemCard {
+    param($Item)
+    $title = [System.Security.SecurityElement]::Escape([string]$Item.Title)
+    $status = [System.Security.SecurityElement]::Escape((Get-QueueStatusLabel -Item $Item))
+    $format = if ($Item.SizeText) { $Item.SizeText } else { $Item.FormatSelector }
+    if ($Item.VideoFormatId) { $format = ("{0}  Video {1}" -f $format, $Item.VideoFormatId).Trim() }
+    if ($Item.AudioFormatId) { $format = ("{0}  Audio {1}" -f $format, $Item.AudioFormatId).Trim() }
+    $format = [System.Security.SecurityElement]::Escape($format)
+    $pct = [int][math]::Max(0,[math]::Min(100,[int]$Item.Percent))
+    $speed = if ($Item.Speed) { [System.Security.SecurityElement]::Escape([string]$Item.Speed) } else { "" }
+    $progressVis = if ($Item.Status -in @("Running","Completed")) { "Visible" } else { "Collapsed" }
+    $playVis = if ($Item.Status -in @("Waiting","Failed","Cancelled")) { "Visible" } else { "Collapsed" }
+    $cancelVis = if ($Item.Status -in @("Running","Waiting","Failed","Cancelled")) { "Visible" } else { "Collapsed" }
+    $deleteVis = if ($Item.Status -eq "Completed") { "Visible" } else { "Collapsed" }
+
+    [xml]$xamlCard = @"
+<Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="White" BorderBrush="#D1D1D6" BorderThickness="1" CornerRadius="8"
+        Padding="10" Margin="0,0,0,8">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,0">
+            <TextBlock Text="$title" FontWeight="SemiBold" FontSize="12.5" TextWrapping="Wrap"/>
+            <TextBlock Text="$format" FontSize="11" Foreground="#86868B" TextWrapping="Wrap"/>
+        </StackPanel>
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Name="btnPlay" Content="▶" Width="28" Height="28" Margin="0,0,4,0"
+                    Visibility="$playVis" ToolTip="Iniciar"/>
+            <Button Name="btnCancel" Content="×" Width="28" Height="28" Margin="0,0,4,0"
+                    Visibility="$cancelVis" ToolTip="Cancelar o quitar"/>
+            <Button Name="btnDelete" Content="🗑" Width="28" Height="28"
+                    Visibility="$deleteVis" ToolTip="Quitar de completadas"/>
+        </StackPanel>
+        <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="$status" FontSize="11" Foreground="#34C759"/>
+            <TextBlock Grid.Column="1" Text="$speed" FontSize="11" Foreground="#1D1D1F"/>
+        </Grid>
+        <ProgressBar Grid.Row="2" Grid.ColumnSpan="2" Height="6" Margin="0,6,0,0"
+                     Minimum="0" Maximum="100" Value="$pct" Visibility="$progressVis"/>
+    </Grid>
+</Border>
+"@
+    $reader = New-Object System.Xml.XmlNodeReader $xamlCard
+    $card = [System.Windows.Markup.XamlReader]::Load($reader)
+    foreach ($name in @("btnPlay","btnCancel","btnDelete")) {
+        $button = $card.FindName($name)
+        if ($button) { $button.Tag = $Item.Id }
+    }
+    $play = $card.FindName("btnPlay")
+    if ($play) { $play.Add_Click({ param($s,$e) Request-QueueItemStart -Id ([string]$s.Tag) }) }
+    $cancel = $card.FindName("btnCancel")
+    if ($cancel) { $cancel.Add_Click({ param($s,$e) Cancel-QueueItem -Id ([string]$s.Tag) }) }
+    $delete = $card.FindName("btnDelete")
+    if ($delete) { $delete.Add_Click({ param($s,$e) Remove-QueueItem -Id ([string]$s.Tag) }) }
+    return $card
+}
+
+function Refresh-QueuePanel {
+    if (-not $spActiveDownloads -or -not $spWaitingDownloads -or -not $spCompletedDownloads) { return }
+    $spActiveDownloads.Children.Clear()
+    $spWaitingDownloads.Children.Clear()
+    $spCompletedDownloads.Children.Clear()
+    if (-not $script:downloadQueue) { $script:downloadQueue = New-Object System.Collections.ArrayList }
+
+    $active = @($script:downloadQueue | Where-Object { $_.Status -eq "Running" })
+    $waiting = @($script:downloadQueue | Where-Object { $_.Status -in @("Waiting","Failed","Cancelled") })
+    $completed = @($script:downloadQueue | Where-Object { $_.Status -eq "Completed" })
+
+    if ($lblActiveHeader) { $lblActiveHeader.Text = "En progreso ($($active.Count))" }
+    if ($lblWaitingHeader) { $lblWaitingHeader.Text = "En espera ($($waiting.Count))" }
+    if ($lblCompletedHeader) { $lblCompletedHeader.Text = "Completadas ($($completed.Count))" }
+    if ($txtQueueSummary) {
+        $txtQueueSummary.Text = ("{0} activas / {1} espera" -f $active.Count, $waiting.Count)
+    }
+
+    if ($active.Count -eq 0) { Add-QueuePlaceholder -Panel $spActiveDownloads -Text "Sin descargas activas" }
+    else { foreach ($item in $active) { [void]$spActiveDownloads.Children.Add((New-QueueItemCard -Item $item)) } }
+
+    if ($waiting.Count -eq 0) { Add-QueuePlaceholder -Panel $spWaitingDownloads -Text "Sin elementos en espera" }
+    else { foreach ($item in $waiting) { [void]$spWaitingDownloads.Children.Add((New-QueueItemCard -Item $item)) } }
+
+    if ($completed.Count -eq 0) { Add-QueuePlaceholder -Panel $spCompletedDownloads -Text "Sin descargas completadas" }
+    else { foreach ($item in $completed) { [void]$spCompletedDownloads.Children.Add((New-QueueItemCard -Item $item)) } }
+}
+
+function Invoke-QueueTick {
+    Monitor-ActiveDownloads
+    Start-NextQueuedDownloads
+    Refresh-QueuePanel
+}
+
+function Stop-AllActiveQueueDownloads {
+    if (-not $script:downloadQueue) { return }
+    foreach ($item in @($script:downloadQueue | Where-Object { $_.Status -eq "Running" })) {
+        $item.CancelRequested = $true
+        try {
+            if ($item.Process -and -not $item.Process.HasExited) { $item.Process.Kill() }
+        } catch {}
+        Close-QueueProcessResources -Item $item
+        if ($item.TargetPath) { Remove-Item -LiteralPath $item.TargetPath -Force -ErrorAction SilentlyContinue }
+        foreach ($logPath in @($item.StdoutPath, $item.StderrPath)) {
+            if (-not [string]::IsNullOrWhiteSpace($logPath)) {
+                Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+        $item.Status = "Waiting"
+        $item.Phase = "En espera"
+        $item.Percent = 0
+        $item.Speed = ""
+        $item.Eta = ""
+        $item.TargetPath = ""
+        $item.StartRequested = $false
+        $item.CancelRequested = $false
+    }
+    Save-DownloadQueue
+}
+
+function Initialize-DownloadQueueUi {
+    if (-not $script:downloadQueue) { $script:downloadQueue = New-Object System.Collections.ArrayList }
+    $script:queueAutoDownload = Get-QueueBool -Value (Get-IniValue -Section "queue" -Key "AutoDownload" -DefaultValue "true") -Default $true
+    $script:queueMaxConcurrent = 2
+    [void][int]::TryParse((Get-IniValue -Section "queue" -Key "MaxConcurrent" -DefaultValue "2"), [ref]$script:queueMaxConcurrent)
+    $script:queueMaxConcurrent = [Math]::Max(1, [Math]::Min(5, [int]$script:queueMaxConcurrent))
+    $script:queuePanelExpanded = Get-QueueBool -Value (Get-IniValue -Section "queue" -Key "PanelExpanded" -DefaultValue "false") -Default $false
+
+    Load-DownloadQueue
+
+    if ($chkAutoDownload) { $chkAutoDownload.IsChecked = [bool]$script:queueAutoDownload }
+    if ($cmbMaxConcurrent) { $cmbMaxConcurrent.SelectedIndex = $script:queueMaxConcurrent - 1 }
+    Set-QueuePanelExpanded -Expanded ([bool]$script:queuePanelExpanded) -SkipSave
+    Refresh-QueuePanel
+
+    if ($btnQueueToggle) {
+        $btnQueueToggle.Add_Click({ Set-QueuePanelExpanded -Expanded (-not [bool]$script:queuePanelExpanded) })
+    }
+    if ($chkAutoDownload) {
+        $chkAutoDownload.Add_Checked({
+            $script:queueAutoDownload = $true
+            Save-DownloadQueueSettings
+        })
+        $chkAutoDownload.Add_Unchecked({
+            $script:queueAutoDownload = $false
+            Save-DownloadQueueSettings
+        })
+    }
+    if ($cmbMaxConcurrent) {
+        $cmbMaxConcurrent.Add_SelectionChanged({
+            $script:queueMaxConcurrent = Get-QueueMaxConcurrent
+            Save-DownloadQueueSettings
+            Start-NextQueuedDownloads
+        })
+    }
+    if ($btnStartQueue) {
+        $btnStartQueue.Add_Click({
+            foreach ($item in @($script:downloadQueue | Where-Object { $_.Status -eq "Waiting" })) {
+                $item.StartRequested = $true
+            }
+            Save-DownloadQueue
+            Start-NextQueuedDownloads
+            Refresh-QueuePanel
+        })
+    }
+    if ($btnClearCompleted) {
+        $btnClearCompleted.Add_Click({ Clear-CompletedQueueItems })
+    }
+    if ($formPrincipal) {
+        $formPrincipal.Add_Closing({
+            try { if ($script:queueTimer) { $script:queueTimer.Stop() } } catch {}
+            Stop-AllActiveQueueDownloads
+        })
+    }
+
+    $script:queueTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:queueTimer.Interval = [TimeSpan]::FromMilliseconds(500)
+    $script:queueTimer.Add_Tick({ Invoke-QueueTick })
+    $script:queueTimer.Start()
+}
+
 function Export-BrowserCookies {
     param([string]$Browser)
     Write-Host "[COOKIES] === Iniciando extraccion de cookies: $Browser ===" -ForegroundColor Cyan

@@ -105,8 +105,8 @@ $script:ultimaURL         = $null
 $script:ultimoTitulo      = $null
 $script:lastThumbUrl      = $null
 $script:formatsEnumerated = $false
-$script:cookiesPath       = Get-IniValue -Section "cookies" -Key "Path" -DefaultValue $null
-$script:cookiesBrowser    = Get-IniValue -Section "cookies" -Key "Browser" -DefaultValue $null
+$script:cookiesPath       = $null
+$script:cookiesBrowser    = $null
 $script:ultimaRutaDescarga = Get-IniValue -Section "ruta" -Key "Destino" -DefaultValue ([Environment]::GetFolderPath('Desktop'))
 $global:UrlPlaceholder    = "BUSCAR VIDEO"
 
@@ -153,11 +153,9 @@ Write-Host "=============================================" -ForegroundColor Dark
 #  EVENTOS DE BOTONES
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ── Cookies ───────────────────────────────────────────────────────────────────
-$btnPickCookies.Add_Click({
-    $ctxCookies = $formPrincipal.FindName("ctxCookies")
-    $ctxCookies.IsOpen = $true
-})
+# ── Cookies ────────────────────────────────────────────────────────────────────────────
+$btnPickCookies.Add_Click({ Show-CookieDialog })
+
 
 # ── Carpeta de destino ────────────────────────────────────────────────────────
 $btnPickDestino.Add_Click({
@@ -180,31 +178,29 @@ $btnSites.Add_Click({ Show-SitesDialog })
 # ── Info / Dependencias ───────────────────────────────────────────────────────
 $btnInfo.Add_Click({ Show-AppInfo })
 
+# ── Cola de descargas ─────────────────────────────────────────────────────────
+Initialize-DownloadQueueUi
+
 # ── Salir ─────────────────────────────────────────────────────────────────────
 $btnExit.Add_Click({
     Write-Host "[EXIT] Cerrando aplicación por solicitud del usuario." -ForegroundColor Yellow
     $formPrincipal.Close()
 })
 
-# ── Consultar / Descargar ─────────────────────────────────────────────────────
+# ── Consultar / Agregar a cola ────────────────────────────────────────────────
 $btnDescargar.Add_Click({
     Refresh-GateByDeps
     $currentUrl  = Get-CurrentUrl
-    $noPlaylistArg = @()
-    if ($script:isPlaylist -or (Test-YouTubePlaylist -Url $currentUrl)) {
-        $noPlaylistArg = @("--no-playlist")
-        Write-Host "[DESCARGA] Forzando --no-playlist" -ForegroundColor Yellow
-    }
     $ready = $script:videoConsultado -and
              -not [string]::IsNullOrWhiteSpace($script:ultimaURL) -and
-             ($script:ultimaURL -eq $currentUrl)
+             ($script:ultimaURL -eq $currentUrl) -and
+             $script:formatsEnumerated
 
     if (-not $ready) {
         if ([string]::IsNullOrWhiteSpace($currentUrl)) {
             $lblEstadoConsulta.Text     = "ERROR: Escribe una URL"
             $lblEstadoConsulta.Foreground = [System.Windows.Media.Brushes]::Red
             [System.Windows.MessageBox]::Show("Escribe una URL de YouTube.", "Falta URL", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
-            Invoke-ConsultaFromUI -Url $currentUrl
             return
         }
         $lblEstadoConsulta.Text     = "Iniciando consulta..."
@@ -212,125 +208,15 @@ $btnDescargar.Add_Click({
         $ok = Invoke-ConsultaFromUI -Url $currentUrl
         if ($ok) {
             Set-DownloadButtonVisual
-            [System.Windows.MessageBox]::Show("Consulta lista. Revisa formatos y vuelve a presionar Descargar para iniciar la descarga.", "Consulta completada", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+            [System.Windows.MessageBox]::Show("Consulta lista. Revisa formatos y vuelve a presionar Agregar a cola.", "Consulta completada", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
         } else { Set-DownloadButtonVisual }
         return
     }
 
-    try { $yt = Get-Command yt-dlp -ErrorAction Stop } catch {
-        [System.Windows.MessageBox]::Show("yt-dlp no está disponible. Valídalo en Dependencias.", "yt-dlp no encontrado", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
-        return
-    }
-
-    $dest = $script:ultimaRutaDescarga
-    if ([string]::IsNullOrWhiteSpace($dest)) {
-        $dest = [Environment]::GetFolderPath('Desktop')
-        $script:ultimaRutaDescarga = $dest
-        try { $txtDestino.Text = $dest } catch {}
-    }
-    if (-not (Test-Path -LiteralPath $dest)) {
-        try { New-Item -ItemType Directory -Path $dest -Force | Out-Null } catch {
-            [System.Windows.MessageBox]::Show("No se pudo preparar la carpeta de destino.", "Error de destino", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
-            return
-        }
-    }
-
-    # ── Selección de formato ───────────────────────────────────────────────────
-    $videoSel        = Get-SelectedFormatId -Combo $cmbVideoFmt
-    $audioSel        = Get-SelectedFormatId -Combo $cmbAudioFmt
-    $hayFormatosAudio = ($script:formatsAudio -and $script:formatsAudio.Count -gt 0)
-
-    if ($videoSel -and $audioSel) {
-        $fSelector = "{0}+{1}" -f $videoSel, $audioSel; $mergeExt = "mp4"
-    } elseif ($videoSel -and $hayFormatosAudio) {
-        $fSelector = "{0}+bestaudio" -f $videoSel;       $mergeExt = "mp4"
-    } elseif ($videoSel) {
-        $fSelector = $videoSel;                           $mergeExt = $null
-    } elseif ($audioSel) {
-        $fSelector = $audioSel;                           $mergeExt = $null
-    } else {
-        if ($hayFormatosAudio) { $fSelector = "bestvideo+bestaudio/best"; $mergeExt = "mp4" }
-        else                   { $fSelector = "best";                      $mergeExt = $null }
-    }
-    Write-DebugLog "[DEBUG] Selector: $fSelector | MergeExt: $mergeExt" -ForegroundColor Yellow
-
-    # ── Nombre del archivo ─────────────────────────────────────────────────────
-    $prevPickDest = $btnPickDestino.IsEnabled; $prevCmbVid = $cmbVideoFmt.IsEnabled; $prevCmbAud = $cmbAudioFmt.IsEnabled
-    $btnPickDestino.IsEnabled = $false; $cmbVideoFmt.IsEnabled = $false; $cmbAudioFmt.IsEnabled = $false
-    $lblEstadoConsulta.Text = "Preparando descarga…"
-
-    $baseTitle = if ($script:ultimoTitulo) { $script:ultimoTitulo } else {
-        $vid = Get-YouTubeVideoId -Url $script:ultimaURL
-        if ($vid) { "video_$vid" } else { "video" }
-    }
-    $baseTitle = Get-SafeFileName -Name $baseTitle
-    $finalExt  = if ([string]::IsNullOrWhiteSpace($mergeExt)) { "mp4" } else { $mergeExt }
-    $targetPath = Join-Path $dest ("{0}.{1}" -f $baseTitle, $finalExt)
-    $idx = 2
-    while (Test-Path -LiteralPath $targetPath) {
-        $targetPath = Join-Path $dest ("{0}_{1}.{2}" -f $baseTitle, $idx, $finalExt); $idx++
-    }
-    Write-Host ("[OUTPUT] Archivo destino: {0}" -f $targetPath) -ForegroundColor Cyan
-
-    # ── Argumentos de yt-dlp ───────────────────────────────────────────────────
-    $dlpArgs = @("--encoding","utf-8","--progress","--no-color","--newline","-f",$fSelector)
-    $dlpArgs += $noPlaylistArg
-    if ($mergeExt) {
-        $dlpArgs += @("--merge-output-format",$mergeExt)
-    }
-    $dlpArgs += @(
-        "-o", $targetPath,
-        "--progress-template","download:%(progress._percent_str)s ETA:%(progress._eta_str)s SPEED:%(progress._speed_str)s",
-        "--extractor-args","youtube:player_client=default,-web_safari,-web_embedded,-tv",
-        "--no-part","--ignore-config"
-    )
-    $dlpArgs += $noPlaylistArg   # doble por seguridad
-    $dlpArgs += Get-JsRuntimeArgs
-    $dlpArgs += Get-ActiveCookiesArgs
-
-    $dlpArgs += $script:ultimaURL
-    $dlpArgs += @("--retries","5","--retry-sleep","2","-N","4")
-
-    # ── Ejecutar descarga ──────────────────────────────────────────────────────
-    [System.Windows.Input.Mouse]::OverrideCursor = [System.Windows.Input.Cursors]::Wait
-    try {
-        $exit = Invoke-YtDlpConsoleProgress -ExePath $yt.Source -Args $dlpArgs -UpdateUi
-        if ($exit -ne 0 -and $videoSel -match '^best(video)?$' -and $script:bestProgId) {
-            Write-Host "[RETRY] Reintento con ID concreto: $($script:bestProgId)" -ForegroundColor Yellow
-            $retryArgs = @(
-                "--encoding","utf-8","--progress","--no-color","--newline",
-                "-f",$script:bestProgId,"-o",$targetPath,
-                "--progress-template","download:%(progress._percent_str)s ETA:%(progress._eta_str)s SPEED:%(progress._speed_str)s",
-                "--extractor-args","youtube:player_client=default,-web_safari,-web_embedded,-tv"
-            )
-            $retryArgs += Get-ActiveCookiesArgs
-            $retryArgs += Get-JsRuntimeArgs
-            $retryArgs += $script:ultimaURL
-            $exit = Invoke-YtDlpConsoleProgress -ExePath $yt.Source -Args $retryArgs -UpdateUi
-        }
-        if ($null -eq $exit -and $script:lastYtDlpExitCode -ne $null) { $exit = $script:lastYtDlpExitCode }
-
-        Write-Host "------------------------" -ForegroundColor DarkGray
-        $archivoExiste = Test-Path -LiteralPath $targetPath
-
-        if ($exit -eq 0 -or $archivoExiste) {
-            if ($exit -ne 0 -and $archivoExiste) {
-                Write-Host "[WARN] ExitCode=$exit pero archivo existe. Se considera éxito." -ForegroundColor Yellow
-            }
-            Add-HistoryUrl -Url $script:ultimaURL
-            $lblEstadoConsulta.Text = ("Completado: {0}" -f $script:ultimoTitulo)
-            [System.Windows.MessageBox]::Show(("Descarga finalizada:`n{0}" -f $script:ultimoTitulo), "Completado", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-        } else {
-            $lblEstadoConsulta.Text = "Error durante la descarga"
-            [System.Windows.MessageBox]::Show("Falló la descarga. Revisa conexión/URL/DRM.", "Error de descarga", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
-            Write-Host "[ERROR] Descarga fallida. ExitCode=$exit" -ForegroundColor Red
-        }
-    } finally {
-        [System.Windows.Input.Mouse]::OverrideCursor = $null
-        $btnPickDestino.IsEnabled = $prevPickDest
-        $cmbVideoFmt.IsEnabled    = $prevCmbVid
-        $cmbAudioFmt.IsEnabled    = $prevCmbAud
+    if (Add-CurrentDownloadToQueue) {
         Set-DownloadButtonVisual
+    } else {
+        [System.Windows.MessageBox]::Show("No se pudo agregar la descarga a la cola.", "Cola de descargas", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
     }
 })
 
@@ -339,10 +225,25 @@ $btnDescargar.Add_Click({
 # ═══════════════════════════════════════════════════════════════════════════════
 Refresh-GateByDeps
 Set-DownloadButtonVisual
+
+# ── Restaurar cookies guardadas de la sesión anterior ─────────────────────────
+$savedCookiePath = Get-IniValue -Section "cookies" -Key "Path" -DefaultValue $null
+if (-not [string]::IsNullOrWhiteSpace($savedCookiePath) -and (Test-Path $savedCookiePath -ErrorAction SilentlyContinue)) {
+    $script:cookiesPath = $savedCookiePath
+    Write-Host "[INIT] Cookies restauradas: $savedCookiePath" -ForegroundColor Green
+} else {
+    # Buscar cualquier archivo de cookies guardado en sesiones anteriores
+    $found = @("edge","chrome","brave","firefox","opera","vivaldi") |
+             ForEach-Object { Join-Path $env:TEMP "ytdll_cookies_$_.txt" } |
+             Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($found) {
+        Write-Host "[INIT] Archivo de cookies encontrado (no activado): $found" -ForegroundColor Yellow
+    }
+}
+Update-CookieButtonVisual
 try { $txtDestino.Text = $script:ultimaRutaDescarga } catch {}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  MOSTRAR LA APLICACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 $formPrincipal.ShowDialog() | Out-Null
-
