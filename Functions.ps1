@@ -1014,6 +1014,7 @@ function Initialize-QueueItemShape {
     Ensure-QueueProperty -Item $Item -Name "BestProgId" -DefaultValue ""
     Ensure-QueueProperty -Item $Item -Name "Status" -DefaultValue "Waiting"
     Ensure-QueueProperty -Item $Item -Name "Phase" -DefaultValue "En espera"
+    Ensure-QueueProperty -Item $Item -Name "DownloadStage" -DefaultValue ""
     Ensure-QueueProperty -Item $Item -Name "Percent" -DefaultValue 0
     Ensure-QueueProperty -Item $Item -Name "Speed" -DefaultValue ""
     Ensure-QueueProperty -Item $Item -Name "Eta" -DefaultValue ""
@@ -1097,6 +1098,7 @@ function Save-DownloadQueue {
                 BestProgId       = $item.BestProgId
                 Status           = $status
                 Phase            = if ($status -eq "Completed") { "Completado" } else { "En espera" }
+                DownloadStage    = ""
                 Percent          = $percent
                 Speed            = ""
                 Eta              = ""
@@ -1143,7 +1145,7 @@ function Set-QueuePanelExpanded {
             $QueuePanel.Visibility = [System.Windows.Visibility]::Visible
             $queueColumn.Width = New-Object System.Windows.GridLength(420)
             $btnQueueToggle.Content = "«"
-            $formPrincipal.Width = 920
+            $formPrincipal.Width = 895
         } else {
             $QueuePanel.Visibility = [System.Windows.Visibility]::Collapsed
             $queueColumn.Width = New-Object System.Windows.GridLength(0)
@@ -1251,6 +1253,7 @@ function Add-CurrentDownloadToQueue {
         BestProgId       = if ($script:bestProgId) { $script:bestProgId } else { "" }
         Status           = "Waiting"
         Phase            = "En espera"
+        DownloadStage    = ""
         Percent          = 0
         Speed            = ""
         Eta              = ""
@@ -1440,6 +1443,7 @@ function Start-QueuedDownload {
         $Item.Process = $proc
         $Item.Status = "Running"
         $Item.Phase = "Preparando..."
+        $Item.DownloadStage = ""
         $Item.Percent = 0
         $Item.Speed = ""
         $Item.Eta = ""
@@ -1476,7 +1480,11 @@ function Update-QueueProgressFromLine {
     param($Item, [string]$Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return }
     if ($Text -match 'Sleeping\s+(\d+(?:\.\d+)?)\s+seconds') { $Item.Phase = "Esperando $($Matches[1])s"; return }
-    if ($Text -match '^\[download\]\s+Destination:') { $Item.Phase = "Descargando"; return }
+    if ($Text -match '^\[download\]\s+Destination:') {
+        Set-QueueDownloadStageFromDestination -Item $Item -Text $Text
+        $Item.Phase = Get-QueueDownloadPhaseLabel -Item $Item
+        return
+    }
     if ($Text -match '^\[Merger\]\s+Merging formats') { $Item.Phase = "Fusionando"; return }
     if ($Text -match '^Deleting original file') { $Item.Phase = "Borrando temporales"; return }
     if ($Text -match '^\[(ExtractAudio|Fixup|EmbedSubtitle|ModifyChapters)\]') { $Item.Phase = "Post-procesando"; return }
@@ -1488,7 +1496,8 @@ function Update-QueueProgressFromLine {
         $Item.Percent = [int][math]::Min(100,[math]::Round([double]$m.Groups['pct'].Value))
         $Item.Eta = $m.Groups['eta'].Value
         $Item.Speed = ($m.Groups['spd'].Value).Trim()
-        if ([string]::IsNullOrWhiteSpace($Item.Phase) -or $Item.Phase -eq "Preparando...") { $Item.Phase = "Descargando" }
+        if ([string]::IsNullOrWhiteSpace($Item.DownloadStage)) { $Item.DownloadStage = "Video" }
+        $Item.Phase = "{0} {1}%" -f (Get-QueueDownloadPhaseLabel -Item $Item), $Item.Percent
     }
 }
 
@@ -1600,6 +1609,29 @@ function Complete-QueuedDownload {
     Save-DownloadQueue
 }
 
+function Set-QueueDownloadStageFromDestination {
+    param($Item, [string]$Text)
+    $videoId = [regex]::Escape([string]$Item.VideoFormatId)
+    $audioId = [regex]::Escape([string]$Item.AudioFormatId)
+    if ($videoId -and $Text -match "\.f$videoId(\.|$)") {
+        $Item.DownloadStage = "Video"
+    } elseif ($audioId -and $Text -match "\.f$audioId(\.|$)") {
+        $Item.DownloadStage = "Audio"
+    } elseif ([string]::IsNullOrWhiteSpace($Item.VideoFormatId) -and -not [string]::IsNullOrWhiteSpace($Item.AudioFormatId)) {
+        $Item.DownloadStage = "Audio"
+    } elseif ([string]::IsNullOrWhiteSpace($Item.DownloadStage)) {
+        $Item.DownloadStage = "Video"
+    } elseif ($Item.DownloadStage -eq "Video" -and -not [string]::IsNullOrWhiteSpace($Item.AudioFormatId)) {
+        $Item.DownloadStage = "Audio"
+    }
+}
+
+function Get-QueueDownloadPhaseLabel {
+    param($Item)
+    if ($Item.DownloadStage -eq "Audio") { return "Descargando audio" }
+    return "Descargando video"
+}
+
 function Monitor-ActiveDownloads {
     if (-not $script:downloadQueue) { return }
     foreach ($item in @($script:downloadQueue | Where-Object { $_.Status -eq "Running" })) {
@@ -1633,6 +1665,7 @@ function Request-QueueItemStart {
     if ($item.Status -in @("Failed","Cancelled")) {
         $item.Status = "Waiting"
         $item.Phase = "En espera"
+        $item.DownloadStage = ""
         $item.Percent = 0
         $item.Speed = ""
         $item.Eta = ""
@@ -1670,6 +1703,25 @@ function Remove-QueueItem {
     [void]$script:downloadQueue.Remove($item)
     Save-DownloadQueue
     Refresh-QueuePanel
+}
+
+function Open-QueueItemFolder {
+    param([Parameter(Mandatory=$true)][string]$Id)
+    $item = Get-QueueItemById -Id $Id
+    if (-not $item) { return }
+    $target = [string]$item.TargetPath
+    try {
+        if (-not [string]::IsNullOrWhiteSpace($target) -and (Test-Path -LiteralPath $target)) {
+            Start-Process -FilePath "explorer.exe" -ArgumentList ("/select,`"{0}`"" -f $target) | Out-Null
+            return
+        }
+        $folder = if (-not [string]::IsNullOrWhiteSpace($item.Destination)) { [string]$item.Destination } else { $script:ultimaRutaDescarga }
+        if (-not [string]::IsNullOrWhiteSpace($folder) -and (Test-Path -LiteralPath $folder)) {
+            Start-Process -FilePath "explorer.exe" -ArgumentList $folder | Out-Null
+        }
+    } catch {
+        Write-Host ("[QUEUE] No se pudo abrir carpeta: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+    }
 }
 
 function Clear-CompletedQueueItems {
@@ -1721,6 +1773,7 @@ function New-QueueItemCard {
     $progressVis = if ($Item.Status -in @("Running","Completed")) { "Visible" } else { "Collapsed" }
     $playVis = if ($Item.Status -in @("Waiting","Failed","Cancelled")) { "Visible" } else { "Collapsed" }
     $cancelVis = if ($Item.Status -in @("Running","Waiting","Failed","Cancelled")) { "Visible" } else { "Collapsed" }
+    $folderVis = if ($Item.Status -eq "Completed") { "Visible" } else { "Collapsed" }
     $deleteVis = if ($Item.Status -eq "Completed") { "Visible" } else { "Collapsed" }
     $statusColor = switch ($Item.Status) {
         "Completed" { "#34C759" }
@@ -1753,6 +1806,8 @@ function New-QueueItemCard {
                     Visibility="$playVis" ToolTip="Iniciar"/>
             <Button Name="btnCancel" Content="×" Width="28" Height="28" Margin="0,0,4,0"
                     Visibility="$cancelVis" ToolTip="Cancelar o quitar"/>
+            <Button Name="btnFolder" Content="📁" Width="28" Height="28" Margin="0,0,4,0"
+                    Visibility="$folderVis" ToolTip="Abrir carpeta"/>
             <Button Name="btnDelete" Content="🗑" Width="28" Height="28"
                     Visibility="$deleteVis" ToolTip="Quitar de completadas"/>
         </StackPanel>
@@ -1771,7 +1826,7 @@ function New-QueueItemCard {
 "@
     $reader = New-Object System.Xml.XmlNodeReader $xamlCard
     $card = [System.Windows.Markup.XamlReader]::Load($reader)
-    foreach ($name in @("btnPlay","btnCancel","btnDelete")) {
+    foreach ($name in @("btnPlay","btnCancel","btnFolder","btnDelete")) {
         $button = $card.FindName($name)
         if ($button) { $button.Tag = $Item.Id }
     }
@@ -1779,6 +1834,8 @@ function New-QueueItemCard {
     if ($play) { $play.Add_Click({ param($s,$e) Request-QueueItemStart -Id ([string]$s.Tag) }) }
     $cancel = $card.FindName("btnCancel")
     if ($cancel) { $cancel.Add_Click({ param($s,$e) Cancel-QueueItem -Id ([string]$s.Tag) }) }
+    $folder = $card.FindName("btnFolder")
+    if ($folder) { $folder.Add_Click({ param($s,$e) Open-QueueItemFolder -Id ([string]$s.Tag) }) }
     $delete = $card.FindName("btnDelete")
     if ($delete) { $delete.Add_Click({ param($s,$e) Remove-QueueItem -Id ([string]$s.Tag) }) }
     return $card
@@ -1834,6 +1891,7 @@ function Stop-AllActiveQueueDownloads {
         }
         $item.Status = "Waiting"
         $item.Phase = "En espera"
+        $item.DownloadStage = ""
         $item.Percent = 0
         $item.Speed = ""
         $item.Eta = ""

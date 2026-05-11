@@ -85,11 +85,10 @@ $ColorSubText     = "#86868B"
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="460"/>
-            <ColumnDefinition Width="34"/>
             <ColumnDefinition x:Name="queueColumn" Width="0"/>
         </Grid.ColumnDefinitions>
 
-    <Border Grid.Column="0" Background="$ColorBgForm" CornerRadius="16" Margin="15">
+    <Border Grid.Column="0" Background="$ColorBgForm" CornerRadius="16" Margin="15,15,0,15">
         <Border.Effect>
             <DropShadowEffect Color="Black" Opacity="0.15" BlurRadius="25" ShadowDepth="5" Direction="270"/>
         </Border.Effect>
@@ -230,20 +229,20 @@ $ColorSubText     = "#86868B"
         </Grid>
     </Border>
 
-        <Button Name="btnQueueToggle" Grid.Column="1" Content="»" Width="28" Height="64"
-                VerticalAlignment="Center" HorizontalAlignment="Center" Cursor="Hand"
-                Background="#F5F5F7" Foreground="$ColorText" BorderBrush="#D1D1D6" BorderThickness="1">
+        <Button Name="btnQueueToggle" Grid.Column="0" Panel.ZIndex="5" Content="»" Width="30" Height="64"
+                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,-15,0" Cursor="Hand"
+                Background="$ColorBgForm" Foreground="$ColorText" BorderBrush="#D1D1D6" BorderThickness="1,1,1,1">
             <Button.Template>
                 <ControlTemplate TargetType="Button">
                     <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="0,10,10,0">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                 </ControlTemplate>
             </Button.Template>
         </Button>
 
-        <Border Name="QueuePanel" Grid.Column="2" Background="$ColorBgForm" CornerRadius="16"
+        <Border Name="QueuePanel" Grid.Column="1" Background="$ColorBgForm" CornerRadius="0,16,16,0"
                 Margin="0,15,15,15" Visibility="Collapsed">
             <Border.Effect>
                 <DropShadowEffect Color="Black" Opacity="0.15" BlurRadius="25" ShadowDepth="5" Direction="270"/>
