@@ -1619,12 +1619,15 @@ function Set-QueuePanelExpanded {
             $QueuePanel.Visibility = [System.Windows.Visibility]::Visible
             $queueColumn.Width = New-Object System.Windows.GridLength(420)
             $btnQueueToggle.Content = "«"
-            $formPrincipal.Width = 895
         } else {
             $QueuePanel.Visibility = [System.Windows.Visibility]::Collapsed
             $queueColumn.Width = New-Object System.Windows.GridLength(0)
             $btnQueueToggle.Content = "»"
-            $formPrincipal.Width = 500
+        }
+        if (Get-Command Update-MainWindowWidth -ErrorAction SilentlyContinue) {
+            Update-MainWindowWidth
+        } else {
+            $formPrincipal.Width = if ($Expanded) { 895 } else { 500 }
         }
     }
     if (-not $SkipSave) { Save-DownloadQueueSettings }
@@ -1696,7 +1699,8 @@ function Add-UrlToDownloadQueue {
         [Parameter(Mandatory=$true)][string]$Url,
         [string]$Title = "Video",
         [string]$Source = "manual",
-        [bool]$NoPlaylist = $true
+        [bool]$NoPlaylist = $true,
+        [switch]$UseGenericFormat
     )
 
     $normalizedUrl = Normalize-InputUrl -Url $Url
@@ -1719,7 +1723,19 @@ function Add-UrlToDownloadQueue {
         }
     }
 
-    $fmt = Get-QueueFormatSelection
+    $fmt = if ($UseGenericFormat) {
+        [pscustomobject]@{
+            Selector   = "bestvideo*+bestaudio/best"
+            MergeExt   = "mp4"
+            VideoId    = ""
+            AudioId    = ""
+            VideoLabel = "Auto"
+            AudioLabel = "Auto"
+            SizeText   = ""
+        }
+    } else {
+        Get-QueueFormatSelection
+    }
     $item = [pscustomobject]@{
         Id               = [guid]::NewGuid().ToString()
         Url              = $normalizedUrl
@@ -1783,7 +1799,7 @@ function Add-VideoFinderResultsToQueue {
         $url = if ($video.url) { [string]$video.url } elseif ($video.Url) { [string]$video.Url } else { "" }
         $title = if ($video.title) { [string]$video.title } elseif ($video.Title) { [string]$video.Title } else { "Video" }
         $source = if ($video.source) { [string]$video.source } elseif ($video.Source) { [string]$video.Source } else { "ai-video-finder" }
-        $res = Add-UrlToDownloadQueue -Url $url -Title $title -Source $source -NoPlaylist $true
+        $res = Add-UrlToDownloadQueue -Url $url -Title $title -Source $source -NoPlaylist $true -UseGenericFormat
         if ($res.Added) {
             $added++
         } else {

@@ -91,6 +91,8 @@ $global:DebugEnabled = [bool]::Parse((Get-IniValue -Section "DEBUG" -Key "Consol
 # ── Feature flags ─────────────────────────────────────────────────────────────
 $script:RequireNode = $true   # Cambiar a $false para no exigir Node.js
 $script:AiEnabled   = [bool]::Parse((Get-IniValue -Section "ai" -Key "Enabled" -DefaultValue "false"))
+$script:aiPanelExpanded = $false
+$script:aiPanelInitialized = $false
 
 # ── Estado compartido de formatos ─────────────────────────────────────────────
 $script:formatsIndex      = @{}
@@ -160,17 +162,15 @@ $btnPickCookies.Add_Click({ Show-CookieDialog })
 # ── IA / Gemini ───────────────────────────────────────────────────────────────
 Update-AiButtonVisual
 $btnAi.Add_Click({
-    $cfg = Get-AiConfig
-    if ($cfg.Enabled -and -not [string]::IsNullOrWhiteSpace($cfg.ApiKey)) {
-        Show-AiChatWindow
-    } else {
-        Show-AiSettingsDialog
-        $cfg = Get-AiConfig
-        if ($cfg.Enabled -and -not [string]::IsNullOrWhiteSpace($cfg.ApiKey)) {
-            Show-AiChatWindow
-        }
-    }
+    if ($script:aiPanelExpanded) { Set-AiPanelExpanded -Expanded $false }
+    else { Show-AiPanel }
 })
+if ($btnAiPanelToggle) {
+    $btnAiPanelToggle.Add_Click({
+        if ($script:aiPanelExpanded) { Set-AiPanelExpanded -Expanded $false }
+        else { Show-AiPanel }
+    })
+}
 
 
 # ── Carpeta de destino ────────────────────────────────────────────────────────

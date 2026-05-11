@@ -84,11 +84,84 @@ $ColorSubText     = "#86868B"
 
     <Grid>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="aiColumn" Width="0"/>
             <ColumnDefinition Width="460"/>
             <ColumnDefinition x:Name="queueColumn" Width="0"/>
         </Grid.ColumnDefinitions>
 
-    <Border Grid.Column="0" Background="$ColorBgForm" CornerRadius="16" Margin="15,15,0,15">
+        <Border Name="AIPanel" Grid.Column="0" Background="$ColorBgForm" CornerRadius="16,0,0,16"
+                Margin="15,15,0,15" Visibility="Collapsed">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" Opacity="0.15" BlurRadius="25" ShadowDepth="5" Direction="270"/>
+            </Border.Effect>
+            <Grid Margin="18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="1.15*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="1.35*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Asistente IA" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Name="lblAiStatus" Text="Gemini listo" FontSize="12" Foreground="$ColorSubText" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Button Name="btnAiSettingsPanel" Grid.Column="1" Content="Configurar"
+                            Height="30" Background="#E5E5EA" Foreground="$ColorText" BorderThickness="0" Cursor="Hand"/>
+                </Grid>
+
+                <Border Grid.Row="1" Background="White" BorderBrush="#D1D1D6" BorderThickness="1" CornerRadius="6">
+                    <ScrollViewer Name="svAiMessages" VerticalScrollBarVisibility="Auto" Padding="10">
+                        <StackPanel Name="spAiMessages"/>
+                    </ScrollViewer>
+                </Border>
+
+                <Grid Grid.Row="2" Margin="0,12,0,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBox Name="txtAiInput" Grid.Row="0" Height="62" AcceptsReturn="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" Padding="8" BorderBrush="#D1D1D6" BorderThickness="1"/>
+                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Name="btnAiSendPanel" Grid.Column="0" Content="Enviar" Height="32"
+                                Background="#007AFF" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                        <Button Name="btnAiFindVideosPanel" Grid.Column="2" Content="Buscar videos" Height="32"
+                                Background="#34C759" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                    </Grid>
+                </Grid>
+
+                <Border Grid.Row="3" Background="White" BorderBrush="#D1D1D6" BorderThickness="1" CornerRadius="6">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
+                        <StackPanel Name="spAiResults"/>
+                    </ScrollViewer>
+                </Border>
+
+                <Grid Grid.Row="4" Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Name="lblAiFooter" Grid.Row="0" Text="Pega un enlace o escribe una peticion."
+                               Foreground="$ColorSubText" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                    <Button Name="btnAddAiVideosToQueuePanel" Grid.Row="1" Content="Agregar seleccionados"
+                            Height="32" Background="#007AFF" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+    <Border Grid.Column="1" Background="$ColorBgForm" CornerRadius="16" Margin="15,15,0,15">
         <Border.Effect>
             <DropShadowEffect Color="Black" Opacity="0.15" BlurRadius="25" ShadowDepth="5" Direction="270"/>
         </Border.Effect>
@@ -243,7 +316,20 @@ $ColorSubText     = "#86868B"
         </Grid>
     </Border>
 
-        <Button Name="btnQueueToggle" Grid.Column="0" Panel.ZIndex="5" Content="»" Width="30" Height="64"
+        <Button Name="btnAiPanelToggle" Grid.Column="1" Panel.ZIndex="5" Content="IA" Width="30" Height="64"
+                VerticalAlignment="Center" HorizontalAlignment="Left" Margin="-15,0,0,0" Cursor="Hand"
+                Background="$ColorBgForm" Foreground="$ColorText" BorderBrush="#D1D1D6" BorderThickness="1,1,1,1">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10,0,0,10">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+
+        <Button Name="btnQueueToggle" Grid.Column="1" Panel.ZIndex="5" Content="»" Width="30" Height="64"
                 VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,-15,0" Cursor="Hand"
                 Background="$ColorBgForm" Foreground="$ColorText" BorderBrush="#D1D1D6" BorderThickness="1,1,1,1">
             <Button.Template>
@@ -256,7 +342,7 @@ $ColorSubText     = "#86868B"
             </Button.Template>
         </Button>
 
-        <Border Name="QueuePanel" Grid.Column="1" Background="$ColorBgForm" CornerRadius="0,16,16,0"
+        <Border Name="QueuePanel" Grid.Column="2" Background="$ColorBgForm" CornerRadius="0,16,16,0"
                 Margin="0,15,15,15" Visibility="Collapsed">
             <Border.Effect>
                 <DropShadowEffect Color="Black" Opacity="0.15" BlurRadius="25" ShadowDepth="5" Direction="270"/>
@@ -335,6 +421,7 @@ $formPrincipal = [System.Windows.Markup.XamlReader]::Load($reader)
 
 $TitleBar = $formPrincipal.FindName("TitleBar")
 $btnAi = $formPrincipal.FindName("btnAi")
+$btnAiPanelToggle = $formPrincipal.FindName("btnAiPanelToggle")
 $btnPickCookies = $formPrincipal.FindName("btnPickCookies")
 $btnInfo = $formPrincipal.FindName("btnInfo")
 $txtUrl = $formPrincipal.FindName("txtUrl")
@@ -350,6 +437,18 @@ $lblVideoInfo = $formPrincipal.FindName("lblVideoInfo")
 $lblEstadoConsulta = $formPrincipal.FindName("lblEstadoConsulta")
 $btnExit = $formPrincipal.FindName("btnExit")
 $btnSites = $formPrincipal.FindName("btnSites")
+$AIPanel = $formPrincipal.FindName("AIPanel")
+$aiColumn = $formPrincipal.FindName("aiColumn")
+$lblAiStatus = $formPrincipal.FindName("lblAiStatus")
+$spAiMessages = $formPrincipal.FindName("spAiMessages")
+$svAiMessages = $formPrincipal.FindName("svAiMessages")
+$txtAiInput = $formPrincipal.FindName("txtAiInput")
+$spAiResults = $formPrincipal.FindName("spAiResults")
+$lblAiFooter = $formPrincipal.FindName("lblAiFooter")
+$btnAiSettingsPanel = $formPrincipal.FindName("btnAiSettingsPanel")
+$btnAiSendPanel = $formPrincipal.FindName("btnAiSendPanel")
+$btnAiFindVideosPanel = $formPrincipal.FindName("btnAiFindVideosPanel")
+$btnAddAiVideosToQueuePanel = $formPrincipal.FindName("btnAddAiVideosToQueuePanel")
 $btnQueueToggle = $formPrincipal.FindName("btnQueueToggle")
 $QueuePanel = $formPrincipal.FindName("QueuePanel")
 $queueColumn = $formPrincipal.FindName("queueColumn")
@@ -566,6 +665,7 @@ function Add-AiChatMessage {
 
 function Add-AiVideoResultCard {
     param($Panel, $Video, $Checks)
+    $fnProbeVideo = ${function:Invoke-YtDlpSingleVideoInfo}
     $card = New-Object System.Windows.Controls.Border
     $card.Margin = "0,0,0,8"
     $card.Padding = "10"
@@ -622,8 +722,9 @@ function Add-AiVideoResultCard {
     $btnProbe.Height = 28
     $btnProbe.MinWidth = 64
     $probeUrl = [string]$Video.url
+    $probeFn = $fnProbeVideo
     $btnProbe.Add_Click({
-        $probe = Invoke-YtDlpSingleVideoInfo -Url $probeUrl
+        $probe = & $probeFn -Url $probeUrl
         if ($probe) {
             [System.Windows.MessageBox]::Show("yt-dlp pudo leer el video.", "Prueba", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
         } else {
@@ -640,6 +741,146 @@ function Add-AiVideoResultCard {
     $card.Child = $grid
     [void]$Panel.Children.Add($card)
     [void]$Checks.Add($chk)
+}
+
+function Update-MainWindowWidth {
+    if (-not $formPrincipal) { return }
+    $width = 500
+    if ($script:aiPanelExpanded) { $width += 405 }
+    if ($script:queuePanelExpanded) { $width += 420 }
+    $formPrincipal.Width = $width
+}
+
+function Set-AiPanelExpanded {
+    param([bool]$Expanded)
+    $script:aiPanelExpanded = $Expanded
+    if ($AIPanel -and $aiColumn -and $btnAiPanelToggle) {
+        if ($Expanded) {
+            $AIPanel.Visibility = [System.Windows.Visibility]::Visible
+            $aiColumn.Width = New-Object System.Windows.GridLength(400)
+            $btnAiPanelToggle.Content = "‹"
+        } else {
+            $AIPanel.Visibility = [System.Windows.Visibility]::Collapsed
+            $aiColumn.Width = New-Object System.Windows.GridLength(0)
+            $btnAiPanelToggle.Content = "IA"
+        }
+    }
+    Update-MainWindowWidth
+}
+
+function Ensure-AiConfigured {
+    $cfg = Get-AiConfig
+    if ($cfg.Enabled -and -not [string]::IsNullOrWhiteSpace($cfg.ApiKey)) { return $true }
+    [System.Windows.MessageBox]::Show("Activa la IA y configura una API Key de Gemini.", "IA", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    Show-AiSettingsDialog
+    $cfg = Get-AiConfig
+    return ($cfg.Enabled -and -not [string]::IsNullOrWhiteSpace($cfg.ApiKey))
+}
+
+function Show-AiPanel {
+    if (-not (Ensure-AiConfigured)) { return }
+    Initialize-AiPanelUi
+    Set-AiPanelExpanded -Expanded $true
+    try { $txtAiInput.Focus() | Out-Null } catch {}
+}
+
+function Invoke-AiPanelSend {
+    $message = $txtAiInput.Text.Trim()
+    if ([string]::IsNullOrWhiteSpace($message)) { return }
+    Add-AiChatMessage -Panel $spAiMessages -Author "Usuario" -Text $message
+    $txtAiInput.Clear()
+    $lblAiStatus.Text = "Consultando Gemini..."
+    $btnAiSendPanel.IsEnabled = $false
+    try {
+        $currentCfg = Get-AiConfig
+        $reply = Invoke-GeminiGenerateContent `
+            -Prompt $message `
+            -SystemInstruction "Eres el asistente de YTDLL. Responde breve y en espanol." `
+            -Model $currentCfg.Model `
+            -ApiKey $currentCfg.ApiKey `
+            -Temperature $currentCfg.Temperature `
+            -MaxOutputTokens $currentCfg.MaxOutputTokens `
+            -ResponseMimeType "text/plain"
+        Add-AiChatMessage -Panel $spAiMessages -Author "IA" -Text $reply
+    } catch {
+        Add-AiChatMessage -Panel $spAiMessages -Author "Error" -Text $_.Exception.Message -IsError $true
+    } finally {
+        $btnAiSendPanel.IsEnabled = $true
+        $lblAiStatus.Text = "Gemini listo"
+        try { $svAiMessages.ScrollToEnd() } catch {}
+    }
+}
+
+function Invoke-AiPanelFindVideos {
+    $message = $txtAiInput.Text.Trim()
+    $url = Get-FirstUrlFromText -Text $message
+    if ([string]::IsNullOrWhiteSpace($url)) {
+        [System.Windows.MessageBox]::Show("Pega una URL para buscar videos.", "Falta URL", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
+        return
+    }
+    Add-AiChatMessage -Panel $spAiMessages -Author "Usuario" -Text $message
+    $txtAiInput.Clear()
+    $spAiResults.Children.Clear()
+    $script:aiPanelChecks.Clear()
+    $lblAiStatus.Text = "Buscando videos..."
+    $lblAiFooter.Text = "Analizando enlace..."
+    $btnAiFindVideosPanel.IsEnabled = $false
+    try {
+        $result = Find-VideosFromUrlWithAi -Url $url
+        Add-AiChatMessage -Panel $spAiMessages -Author "IA" -Text $result.summary
+        foreach ($warning in @($result.warnings)) {
+            if (-not [string]::IsNullOrWhiteSpace($warning)) {
+                Add-AiChatMessage -Panel $spAiMessages -Author "Aviso" -Text ([string]$warning)
+            }
+        }
+        foreach ($video in @($result.videos)) {
+            Add-AiVideoResultCard -Panel $spAiResults -Video $video -Checks $script:aiPanelChecks
+        }
+        if (@($result.videos).Count -eq 0) {
+            $empty = New-Object System.Windows.Controls.TextBlock
+            $empty.Text = "No se encontraron videos descargables en ese enlace."
+            $empty.Foreground = "#6E6E73"
+            $empty.Margin = "4"
+            [void]$spAiResults.Children.Add($empty)
+        }
+        $lblAiFooter.Text = "{0} resultado(s) listo(s)." -f @($result.videos).Count
+    } catch {
+        Add-AiChatMessage -Panel $spAiMessages -Author "Error" -Text $_.Exception.Message -IsError $true
+        $lblAiFooter.Text = "No se pudo completar la busqueda."
+    } finally {
+        $btnAiFindVideosPanel.IsEnabled = $true
+        $lblAiStatus.Text = "Gemini listo"
+        try { $svAiMessages.ScrollToEnd() } catch {}
+    }
+}
+
+function Add-AiPanelSelectedVideosToQueue {
+    $selected = @()
+    foreach ($chk in @($script:aiPanelChecks)) {
+        if ($chk.IsChecked) { $selected += $chk.Tag }
+    }
+    if ($selected.Count -eq 0) {
+        [System.Windows.MessageBox]::Show("Selecciona al menos un video.", "Cola", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+        return
+    }
+    $res = Add-VideoFinderResultsToQueue -Videos $selected
+    $text = "Agregados: {0}`nOmitidos: {1}" -f $res.Added, $res.Skipped
+    if ($res.Messages.Count -gt 0) { $text += "`n`n" + (($res.Messages | Select-Object -First 5) -join "`n") }
+    [System.Windows.MessageBox]::Show($text, "Cola de descargas", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+    $lblAiFooter.Text = "Cola actualizada."
+}
+
+function Initialize-AiPanelUi {
+    if ($script:aiPanelInitialized) { return }
+    $script:aiPanelChecks = New-Object System.Collections.ArrayList
+    if ($spAiMessages) {
+        Add-AiChatMessage -Panel $spAiMessages -Author "IA" -Text "Pega un enlace y usa Buscar videos para detectar opciones descargables."
+    }
+    if ($btnAiSettingsPanel) { $btnAiSettingsPanel.Add_Click({ Show-AiSettingsDialog; Update-AiButtonVisual }) }
+    if ($btnAiSendPanel) { $btnAiSendPanel.Add_Click({ Invoke-AiPanelSend }) }
+    if ($btnAiFindVideosPanel) { $btnAiFindVideosPanel.Add_Click({ Invoke-AiPanelFindVideos }) }
+    if ($btnAddAiVideosToQueuePanel) { $btnAddAiVideosToQueuePanel.Add_Click({ Add-AiPanelSelectedVideosToQueue }) }
+    $script:aiPanelInitialized = $true
 }
 
 function Show-AiChatWindow {
