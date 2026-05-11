@@ -1019,6 +1019,11 @@ function Initialize-QueueItemShape {
     Ensure-QueueProperty -Item $Item -Name "Eta" -DefaultValue ""
     Ensure-QueueProperty -Item $Item -Name "TargetPath" -DefaultValue ""
     Ensure-QueueProperty -Item $Item -Name "ExitCode" -DefaultValue $null
+    Ensure-QueueProperty -Item $Item -Name "LastError" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "DebugLogPath" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "ArgsText" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "OutputTail" -DefaultValue ""
+    Ensure-QueueProperty -Item $Item -Name "ErrorTail" -DefaultValue ""
     Ensure-QueueProperty -Item $Item -Name "CreatedAt" -DefaultValue ([DateTime]::Now.ToString("o"))
     Ensure-QueueProperty -Item $Item -Name "StartedAt" -DefaultValue ""
     Ensure-QueueProperty -Item $Item -Name "CompletedAt" -DefaultValue ""
@@ -1097,6 +1102,8 @@ function Save-DownloadQueue {
                 Eta              = ""
                 TargetPath       = if ($status -eq "Completed") { $item.TargetPath } else { "" }
                 ExitCode         = $item.ExitCode
+                LastError        = $item.LastError
+                DebugLogPath     = $item.DebugLogPath
                 CreatedAt        = $item.CreatedAt
                 StartedAt        = $item.StartedAt
                 CompletedAt      = $item.CompletedAt
@@ -1249,6 +1256,11 @@ function Add-CurrentDownloadToQueue {
         Eta              = ""
         TargetPath       = ""
         ExitCode         = $null
+        LastError        = ""
+        DebugLogPath     = ""
+        ArgsText         = ""
+        OutputTail       = ""
+        ErrorTail        = ""
         CreatedAt        = [DateTime]::Now.ToString("o")
         StartedAt        = ""
         CompletedAt      = ""
@@ -1298,11 +1310,76 @@ function New-QueueTargetPath {
 }
 
 function Join-YtdllArgumentList {
-    param([string[]]$Args)
-    return (($Args | ForEach-Object {
+    param([string[]]$ArgumentArray)
+    return (($ArgumentArray | ForEach-Object {
         $s = [string]$_
         if ($s -match '[\s"]') { '"' + ($s -replace '"','\"') + '"' } else { $s }
     }) -join ' ')
+}
+
+function Get-QueueLogDirectory {
+    $base = if ([string]::IsNullOrWhiteSpace($script:ConfigDir)) { "C:\Temp\ytdll" } else { $script:ConfigDir }
+    $dir = Join-Path $base "queue_logs"
+    if (-not (Test-Path -LiteralPath $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    return $dir
+}
+
+function New-QueueDebugLogPath {
+    param($Item)
+    $safe = Get-SafeFileName -Name $Item.Title
+    if ($safe.Length -gt 36) { $safe = $safe.Substring(0,36).Trim() }
+    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    return (Join-Path (Get-QueueLogDirectory) ("{0}_{1}_{2}.log" -f $stamp, $safe, $Item.Id.Substring(0,8)))
+}
+
+function Write-QueueDebugLog {
+    param(
+        $Item,
+        [string]$Text,
+        [switch]$NoNewLine
+    )
+    if (-not $Item -or [string]::IsNullOrWhiteSpace($Item.DebugLogPath)) { return }
+    try {
+        if ($NoNewLine) {
+            [System.IO.File]::AppendAllText($Item.DebugLogPath, $Text, [System.Text.Encoding]::UTF8)
+        } else {
+            [System.IO.File]::AppendAllText($Item.DebugLogPath, ($Text + [Environment]::NewLine), [System.Text.Encoding]::UTF8)
+        }
+    } catch {}
+}
+
+function Add-QueueTextTail {
+    param(
+        $Item,
+        [string]$PropertyName,
+        [string]$Text,
+        [int]$MaxChars = 4000
+    )
+    if (-not $Item -or [string]::IsNullOrEmpty($Text)) { return }
+    $value = [string]$Item.$PropertyName + $Text
+    if ($value.Length -gt $MaxChars) {
+        $value = $value.Substring($value.Length - $MaxChars)
+    }
+    $Item.$PropertyName = $value
+}
+
+function Get-QueueReadableError {
+    param($Item)
+    $raw = ""
+    if ($Item -and -not [string]::IsNullOrWhiteSpace($Item.ErrorTail)) { $raw = $Item.ErrorTail }
+    elseif ($Item -and -not [string]::IsNullOrWhiteSpace($Item.OutputTail)) { $raw = $Item.OutputTail }
+    $lines = @($raw -split "\r\n|\n|\r" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($lines.Count -eq 0) { return "" }
+    $useful = @($lines | Where-Object {
+        $_ -notmatch '^\[download\]' -and
+        $_ -notmatch '^frame=' -and
+        $_ -notmatch '^size='
+    })
+    if ($useful.Count -eq 0) { $useful = $lines }
+    $tail = @($useful | Select-Object -Last 4)
+    return ($tail -join " | ")
 }
 
 function Start-QueuedDownload {
@@ -1318,26 +1395,41 @@ function Start-QueuedDownload {
     try {
         $targetPath = New-QueueTargetPath -Item $Item
         $Item.TargetPath = $targetPath
-        $args = @("--encoding","utf-8","--progress","--no-color","--newline","-f",$Item.FormatSelector)
-        if ($Item.NoPlaylist) { $args += "--no-playlist" }
+        $dlpArgs = @("--encoding","utf-8","--progress","--no-color","--newline","-f",$Item.FormatSelector)
+        if ($global:DebugEnabled) { $dlpArgs += "--verbose" }
+        if ($Item.NoPlaylist) { $dlpArgs += "--no-playlist" }
         if (-not [string]::IsNullOrWhiteSpace($Item.MergeExt)) {
-            $args += @("--merge-output-format", $Item.MergeExt)
+            $dlpArgs += @("--merge-output-format", $Item.MergeExt)
         }
-        $args += @(
+        $dlpArgs += @(
             "-o", $targetPath,
             "--progress-template", "download:%(progress._percent_str)s ETA:%(progress._eta_str)s SPEED:%(progress._speed_str)s"
         )
-        $args += Get-JsRuntimeArgs
-        $args += Get-ActiveCookiesArgs
-        $args += Get-YouTubeExtractorArgs -Url $Item.Url
-        $args += @("--no-part","--ignore-config", $Item.Url, "--retries","5","--retry-sleep","2","-N","4")
+        $dlpArgs += Get-JsRuntimeArgs
+        $dlpArgs += Get-ActiveCookiesArgs
+        $dlpArgs += Get-YouTubeExtractorArgs -Url $Item.Url
+        $dlpArgs += @("--no-part","--ignore-config", $Item.Url, "--retries","5","--retry-sleep","2","-N","4")
 
         $tmpDir = [System.IO.Path]::GetTempPath()
         $Item.StdoutPath = Join-Path $tmpDir ("ytdll-queue-out_{0}.log" -f $Item.Id)
         $Item.StderrPath = Join-Path $tmpDir ("ytdll-queue-err_{0}.log" -f $Item.Id)
         Remove-Item -LiteralPath $Item.StdoutPath, $Item.StderrPath -Force -ErrorAction SilentlyContinue
 
-        $argLine = Join-YtdllArgumentList -Args $args
+        $argLine = Join-YtdllArgumentList -ArgumentArray $dlpArgs
+        $Item.DebugLogPath = New-QueueDebugLogPath -Item $Item
+        $Item.ArgsText = "{0} {1}" -f $yt.Source, $argLine
+        $Item.OutputTail = ""
+        $Item.ErrorTail = ""
+        $Item.LastError = ""
+        Write-QueueDebugLog -Item $Item -Text ("YTDLL QUEUE DEBUG {0}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+        Write-QueueDebugLog -Item $Item -Text ("Title: {0}" -f $Item.Title)
+        Write-QueueDebugLog -Item $Item -Text ("URL: {0}" -f $Item.Url)
+        Write-QueueDebugLog -Item $Item -Text ("Target: {0}" -f $Item.TargetPath)
+        Write-QueueDebugLog -Item $Item -Text ("Selector: {0} | MergeExt: {1}" -f $Item.FormatSelector, $Item.MergeExt)
+        Write-QueueDebugLog -Item $Item -Text ("Command: {0}" -f $Item.ArgsText)
+        Write-QueueDebugLog -Item $Item -Text ""
+        Write-DebugLog ("[QUEUE][DEBUG] Comando: {0}" -f $Item.ArgsText) -ForegroundColor DarkGray
+        Write-DebugLog ("[QUEUE][DEBUG] Log: {0}" -f $Item.DebugLogPath) -ForegroundColor DarkGray
         $proc = Start-Process -FilePath $yt.Source -ArgumentList $argLine -NoNewWindow -PassThru `
             -RedirectStandardOutput $Item.StdoutPath -RedirectStandardError $Item.StderrPath
 
@@ -1368,8 +1460,13 @@ function Start-QueuedDownload {
         }
         $Item.Status = "Failed"
         $Item.Phase = "No se pudo iniciar"
+        $Item.LastError = $_.Exception.Message
         $Item.StartRequested = $false
         Write-Host "[QUEUE] Error iniciando descarga: $($_.Exception.Message)" -ForegroundColor Red
+        if ($Item.DebugLogPath) {
+            Write-QueueDebugLog -Item $Item -Text ("START ERROR: {0}" -f $_.Exception.Message)
+            Write-Host ("[QUEUE] Log de diagnostico: {0}" -f $Item.DebugLogPath) -ForegroundColor Yellow
+        }
         Save-DownloadQueue
         return $false
     }
@@ -1404,6 +1501,13 @@ function Read-QueueProcessOutput {
         if (-not $reader) { continue }
         $chunk = $reader.ReadToEnd()
         if ([string]::IsNullOrEmpty($chunk)) { continue }
+        if ($kind -eq "Out") {
+            Add-QueueTextTail -Item $Item -PropertyName "OutputTail" -Text $chunk
+            Write-QueueDebugLog -Item $Item -Text $chunk -NoNewLine
+        } else {
+            Add-QueueTextTail -Item $Item -PropertyName "ErrorTail" -Text $chunk
+            Write-QueueDebugLog -Item $Item -Text $chunk -NoNewLine
+        }
         $text = [string]$Item.$fragProp + $chunk
         $parts = [regex]::Split($text, "\r\n|\n|\r")
         for ($i = 0; $i -lt $parts.Length - 1; $i++) {
@@ -1438,7 +1542,15 @@ function Complete-QueuedDownload {
     $Item.LastOutFragment = ""
     $Item.LastErrFragment = ""
     $exit = $null
-    try { $exit = $Item.Process.ExitCode } catch {}
+    try {
+        $procObj = $Item.Process
+        if ($procObj -is [System.Management.Automation.PSObject]) { $procObj = $procObj.BaseObject }
+        if ($procObj) {
+            $procObj.Refresh()
+            if (-not $procObj.HasExited) { [void]$procObj.WaitForExit(1000) }
+            $exit = $procObj.ExitCode
+        }
+    } catch {}
     $Item.ExitCode = $exit
     Close-QueueProcessResources -Item $Item
 
@@ -1466,12 +1578,25 @@ function Complete-QueuedDownload {
         Write-Host ("[QUEUE] Completada: {0}" -f $Item.Title) -ForegroundColor Green
     } else {
         $Item.Status = "Failed"
-        $Item.Phase = "Error"
+        $Item.LastError = Get-QueueReadableError -Item $Item
+        if ([string]::IsNullOrWhiteSpace($Item.LastError)) { $Item.LastError = "yt-dlp termino con ExitCode=$exit" }
+        $Item.Phase = "Error: $($Item.LastError)"
         $Item.StartRequested = $false
         if ($Item.TargetPath) { Remove-Item -LiteralPath $Item.TargetPath -Force -ErrorAction SilentlyContinue }
         Write-Host ("[QUEUE] Error: {0} ExitCode={1}" -f $Item.Title, $exit) -ForegroundColor Red
+        Write-Host ("[QUEUE] Detalle: {0}" -f $Item.LastError) -ForegroundColor Red
+        if ($Item.DebugLogPath) {
+            Write-Host ("[QUEUE] Log de diagnostico: {0}" -f $Item.DebugLogPath) -ForegroundColor Yellow
+            Write-QueueDebugLog -Item $Item -Text ""
+            Write-QueueDebugLog -Item $Item -Text ("ExitCode: {0}" -f $exit)
+            Write-QueueDebugLog -Item $Item -Text ("ReadableError: {0}" -f $Item.LastError)
+        }
     }
-    Remove-Item -LiteralPath $Item.StdoutPath, $Item.StderrPath -Force -ErrorAction SilentlyContinue
+    foreach ($logPath in @($Item.StdoutPath, $Item.StderrPath)) {
+        if (-not [string]::IsNullOrWhiteSpace($logPath)) {
+            Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+        }
+    }
     Save-DownloadQueue
 }
 
@@ -1582,6 +1707,11 @@ function New-QueueItemCard {
     param($Item)
     $title = [System.Security.SecurityElement]::Escape([string]$Item.Title)
     $status = [System.Security.SecurityElement]::Escape((Get-QueueStatusLabel -Item $Item))
+    if ($Item.Status -eq "Failed" -and -not [string]::IsNullOrWhiteSpace($Item.LastError)) {
+        $shortError = [string]$Item.LastError
+        if ($shortError.Length -gt 120) { $shortError = $shortError.Substring(0,120).Trim() + "..." }
+        $status = [System.Security.SecurityElement]::Escape("Error: $shortError")
+    }
     $format = if ($Item.SizeText) { $Item.SizeText } else { $Item.FormatSelector }
     if ($Item.VideoFormatId) { $format = ("{0}  Video {1}" -f $format, $Item.VideoFormatId).Trim() }
     if ($Item.AudioFormatId) { $format = ("{0}  Audio {1}" -f $format, $Item.AudioFormatId).Trim() }
@@ -1592,6 +1722,12 @@ function New-QueueItemCard {
     $playVis = if ($Item.Status -in @("Waiting","Failed","Cancelled")) { "Visible" } else { "Collapsed" }
     $cancelVis = if ($Item.Status -in @("Running","Waiting","Failed","Cancelled")) { "Visible" } else { "Collapsed" }
     $deleteVis = if ($Item.Status -eq "Completed") { "Visible" } else { "Collapsed" }
+    $statusColor = switch ($Item.Status) {
+        "Completed" { "#34C759" }
+        "Failed" { "#FF3B30" }
+        "Cancelled" { "#FF9500" }
+        default { "#34C759" }
+    }
 
     [xml]$xamlCard = @"
 <Border xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -1625,7 +1761,7 @@ function New-QueueItemCard {
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="$status" FontSize="11" Foreground="#34C759"/>
+            <TextBlock Text="$status" FontSize="11" Foreground="$statusColor" TextWrapping="Wrap"/>
             <TextBlock Grid.Column="1" Text="$speed" FontSize="11" Foreground="#1D1D1F"/>
         </Grid>
         <ProgressBar Grid.Row="2" Grid.ColumnSpan="2" Height="6" Margin="0,6,0,0"
