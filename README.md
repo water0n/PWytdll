@@ -106,6 +106,15 @@ Funciones Avanzadas
 
 🍪 Soporte para cookies
 
+## IA con Gemini
+
+YTDLL permite activar un asistente IA usando Gemini Flash para ayudar a buscar videos dentro de enlaces y agregarlos a la cola de descargas.
+
+- La API Key se guarda cifrada con DPAPI del usuario local.
+- El motor tecnico de deteccion sigue siendo yt-dlp.
+- Gemini clasifica y resume candidatos, pero no descarga contenido directamente.
+- Los resultados siempre se muestran para seleccionarlos antes de agregarlos a la cola.
+
 ## 📁 Estructura del Proyecto / Project Structure
 PWytdll/
 ├── ytdll.ps1                 # Main script

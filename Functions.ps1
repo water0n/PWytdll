@@ -28,7 +28,7 @@ function Set-IniValue {
     $lines       = @()
     $sectionFound = $false
     $keyFound     = $false
-    if (Test-Path $script:ConfigFile) { $lines = Get-Content $script:ConfigFile }
+    if (Test-Path $script:ConfigFile) { $lines = @(Get-Content $script:ConfigFile) }
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if ($lines[$i].Trim() -eq "[$Section]") {
             $sectionFound = $true
@@ -41,7 +41,9 @@ function Set-IniValue {
                 }
             }
             if (-not $keyFound) {
-                $lines = @($lines[0..$i]) + @("$Key=$Value") + @($lines[($i+1)..($lines.Count-1)])
+                $before = if ($i -ge 0) { @($lines[0..$i]) } else { @() }
+                $after = if (($i + 1) -lt $lines.Count) { @($lines[($i+1)..($lines.Count-1)]) } else { @() }
+                $lines = @($before) + @("$Key=$Value") + @($after)
             }
             break
         }
@@ -57,6 +59,478 @@ function Set-IniValue {
 function Write-DebugLog {
     param([string]$Message, [string]$ForegroundColor = "Yellow")
     if ($global:DebugEnabled) { Write-Host $Message -ForegroundColor $ForegroundColor }
+}
+
+function ConvertTo-ProtectedText {
+    param([string]$PlainText)
+    if ([string]::IsNullOrWhiteSpace($PlainText)) { return "" }
+    $secure = ConvertTo-SecureString $PlainText -AsPlainText -Force
+    return ($secure | ConvertFrom-SecureString)
+}
+
+function ConvertFrom-ProtectedText {
+    param([string]$ProtectedText)
+    if ([string]::IsNullOrWhiteSpace($ProtectedText)) { return "" }
+    $secure = $ProtectedText | ConvertTo-SecureString
+    $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    }
+}
+
+function Get-AiConfig {
+    $protectedKey = Get-IniValue -Section "ai" -Key "ApiKeyProtected" -DefaultValue ""
+    $plainKey = ""
+    if (-not [string]::IsNullOrWhiteSpace($protectedKey)) {
+        try { $plainKey = ConvertFrom-ProtectedText -ProtectedText $protectedKey } catch { $plainKey = "" }
+    }
+    if ([string]::IsNullOrWhiteSpace($plainKey)) {
+        $plainKey = Get-IniValue -Section "ai" -Key "ApiKey" -DefaultValue ""
+    }
+
+    $enabledRaw = Get-IniValue -Section "ai" -Key "Enabled" -DefaultValue "false"
+    $chatRaw = Get-IniValue -Section "ai" -Key "ChatEnabled" -DefaultValue $enabledRaw
+    $finderRaw = Get-IniValue -Section "ai" -Key "VideoFinderEnabled" -DefaultValue "true"
+    $saveHistoryRaw = Get-IniValue -Section "ai" -Key "SaveChatHistory" -DefaultValue "false"
+    $temperatureRaw = Get-IniValue -Section "ai" -Key "Temperature" -DefaultValue "0.2"
+    $tokensRaw = Get-IniValue -Section "ai" -Key "MaxOutputTokens" -DefaultValue "2048"
+
+    $enabled = $false
+    $chatEnabled = $false
+    $videoFinderEnabled = $true
+    $saveHistory = $false
+    [void][bool]::TryParse($enabledRaw, [ref]$enabled)
+    [void][bool]::TryParse($chatRaw, [ref]$chatEnabled)
+    [void][bool]::TryParse($finderRaw, [ref]$videoFinderEnabled)
+    [void][bool]::TryParse($saveHistoryRaw, [ref]$saveHistory)
+
+    $temperature = 0.2
+    $maxOutputTokens = 2048
+    [void][double]::TryParse($temperatureRaw, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$temperature)
+    [void][int]::TryParse($tokensRaw, [ref]$maxOutputTokens)
+
+    return [pscustomobject]@{
+        Enabled            = $enabled
+        Provider           = Get-IniValue -Section "ai" -Key "Provider" -DefaultValue "Gemini"
+        Model              = Get-IniValue -Section "ai" -Key "Model" -DefaultValue "gemini-2.5-flash"
+        ApiKey             = $plainKey
+        Temperature        = $temperature
+        MaxOutputTokens    = $maxOutputTokens
+        ChatEnabled        = $chatEnabled
+        VideoFinderEnabled = $videoFinderEnabled
+        SaveChatHistory    = $saveHistory
+        ApiKeyEncrypted    = (-not [string]::IsNullOrWhiteSpace($protectedKey))
+    }
+}
+
+function Save-AiConfig {
+    param(
+        [bool]$Enabled,
+        [string]$Provider = "Gemini",
+        [string]$Model = "gemini-2.5-flash",
+        [string]$ApiKey = "",
+        [double]$Temperature = 0.2,
+        [int]$MaxOutputTokens = 2048,
+        [bool]$ChatEnabled = $true,
+        [bool]$VideoFinderEnabled = $true,
+        [bool]$SaveChatHistory = $false
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Provider)) { $Provider = "Gemini" }
+    if ([string]::IsNullOrWhiteSpace($Model)) { $Model = "gemini-2.5-flash" }
+    if ($MaxOutputTokens -lt 128) { $MaxOutputTokens = 128 }
+
+    Set-IniValue -Section "ai" -Key "Enabled" -Value ([string]$Enabled).ToLower()
+    Set-IniValue -Section "ai" -Key "Provider" -Value $Provider
+    Set-IniValue -Section "ai" -Key "Model" -Value $Model
+    Set-IniValue -Section "ai" -Key "ApiKey" -Value ""
+    Set-IniValue -Section "ai" -Key "ApiKeyProtected" -Value (ConvertTo-ProtectedText -PlainText $ApiKey)
+    Set-IniValue -Section "ai" -Key "Temperature" -Value ($Temperature.ToString([System.Globalization.CultureInfo]::InvariantCulture))
+    Set-IniValue -Section "ai" -Key "MaxOutputTokens" -Value ([string]$MaxOutputTokens)
+    Set-IniValue -Section "ai" -Key "ChatEnabled" -Value ([string]$ChatEnabled).ToLower()
+    Set-IniValue -Section "ai" -Key "VideoFinderEnabled" -Value ([string]$VideoFinderEnabled).ToLower()
+    Set-IniValue -Section "ai" -Key "SaveChatHistory" -Value ([string]$SaveChatHistory).ToLower()
+    Set-IniValue -Section "ai_security" -Key "ApiKeyEncrypted" -Value "true"
+    Set-IniValue -Section "ai_security" -Key "ApiKeyStorage" -Value "LocalUserDPAPI"
+}
+
+function Write-AiLog {
+    param(
+        [Parameter(Mandatory=$true)][string]$Message,
+        [string]$Level = "INFO"
+    )
+    try {
+        $logDir = Join-Path $script:ConfigDir "logs"
+        if (-not (Test-Path -LiteralPath $logDir)) {
+            New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        }
+        $line = "{0}`t{1}`t{2}" -f ([DateTime]::Now.ToString("s")), $Level.ToUpperInvariant(), $Message
+        Add-Content -LiteralPath (Join-Path $logDir "ai.log") -Value $line -Encoding UTF8
+    } catch {
+        Write-DebugLog "[AI] No se pudo escribir ai.log: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+function Invoke-GeminiGenerateContent {
+    param(
+        [Parameter(Mandatory=$true)][string]$Prompt,
+        [string]$SystemInstruction = "",
+        [string]$Model = "gemini-2.5-flash",
+        [Parameter(Mandatory=$true)][string]$ApiKey,
+        [double]$Temperature = 0.2,
+        [int]$MaxOutputTokens = 2048,
+        [string]$ResponseMimeType = "application/json"
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+        throw "No se ha configurado la API Key de Gemini."
+    }
+    if ([string]::IsNullOrWhiteSpace($Model)) { $Model = "gemini-2.5-flash" }
+    if ($MaxOutputTokens -lt 128) { $MaxOutputTokens = 128 }
+
+    $uri = "https://generativelanguage.googleapis.com/v1beta/models/$Model`:generateContent"
+    $generationConfig = @{
+        temperature = $Temperature
+        maxOutputTokens = $MaxOutputTokens
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ResponseMimeType)) {
+        $generationConfig.responseMimeType = $ResponseMimeType
+    }
+
+    $bodyObject = @{
+        contents = @(
+            @{
+                role = "user"
+                parts = @(@{ text = $Prompt })
+            }
+        )
+        generationConfig = $generationConfig
+    }
+    if (-not [string]::IsNullOrWhiteSpace($SystemInstruction)) {
+        $bodyObject.systemInstruction = @{
+            parts = @(@{ text = $SystemInstruction })
+        }
+    }
+
+    $body = $bodyObject | ConvertTo-Json -Depth 12
+    $headers = @{
+        "x-goog-api-key" = $ApiKey
+        "Content-Type"   = "application/json"
+    }
+
+    try {
+        $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body -TimeoutSec 60
+        $text = $response.candidates[0].content.parts[0].text
+        if ([string]::IsNullOrWhiteSpace($text)) { throw "Gemini no devolvio texto." }
+        return $text
+    } catch {
+        $message = $_.Exception.Message
+        try {
+            $stream = $_.Exception.Response.GetResponseStream()
+            if ($stream) {
+                $reader = New-Object System.IO.StreamReader($stream)
+                $apiError = $reader.ReadToEnd()
+                if (-not [string]::IsNullOrWhiteSpace($apiError)) { $message = $apiError }
+            }
+        } catch {}
+        Write-AiLog -Level "ERROR" -Message ("Gemini generateContent fallo con modelo {0}: {1}" -f $Model, $message)
+        throw "Error llamando a Gemini: $message"
+    }
+}
+
+function Test-AiConnection {
+    param(
+        [string]$Model = $null,
+        [string]$ApiKey = $null,
+        [double]$Temperature = 0,
+        [int]$MaxOutputTokens = 128
+    )
+    $cfg = Get-AiConfig
+    if ([string]::IsNullOrWhiteSpace($Model)) { $Model = $cfg.Model }
+    if ($null -eq $ApiKey) { $ApiKey = $cfg.ApiKey }
+
+    try {
+        $result = Invoke-GeminiGenerateContent `
+            -Prompt 'Devuelve este JSON exacto: {"ok":true,"message":"conexion correcta"}' `
+            -SystemInstruction "Responde solo JSON valido." `
+            -Model $Model `
+            -ApiKey $ApiKey `
+            -Temperature $Temperature `
+            -MaxOutputTokens $MaxOutputTokens `
+            -ResponseMimeType "application/json"
+
+        [void]($result | ConvertFrom-Json)
+        return [pscustomobject]@{ Ok = $true; Message = $result }
+    } catch {
+        return [pscustomobject]@{ Ok = $false; Message = $_.Exception.Message }
+    }
+}
+
+function Get-FirstUrlFromText {
+    param([string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
+    $m = [regex]::Match($Text, '(https?://[^\s<>"'']+|www\.[^\s<>"'']+)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $m.Success) { return "" }
+    return (Normalize-InputUrl -Url $m.Value.TrimEnd('.', ',', ';', ')', ']'))
+}
+
+function Resolve-DetectedVideoUrl {
+    param([string]$CandidateUrl, [string]$OriginalUrl)
+    if ([string]::IsNullOrWhiteSpace($CandidateUrl)) { return "" }
+    $candidate = $CandidateUrl.Trim()
+    if ($candidate -match '^https?://') { return $candidate }
+    if ($candidate -match '^//') {
+        try { return ([Uri]$OriginalUrl).Scheme + ":" + $candidate } catch { return "https:$candidate" }
+    }
+    if ($OriginalUrl -match 'youtube\.com|youtu\.be') {
+        if ($candidate -match '^[A-Za-z0-9_-]{11}$') { return "https://www.youtube.com/watch?v=$candidate" }
+        if ($candidate -match '^/watch') {
+            try {
+                $base = [Uri]$OriginalUrl
+                return "$($base.Scheme)://$($base.Host)$candidate"
+            } catch {}
+        }
+    }
+    try { return ([Uri]::new([Uri]$OriginalUrl, $candidate)).AbsoluteUri } catch { return $candidate }
+}
+
+function Convert-TechnicalCandidatesToAiResult {
+    param(
+        [string]$Summary,
+        [array]$Candidates,
+        [array]$Warnings = @()
+    )
+    $videos = @()
+    foreach ($candidate in @($Candidates)) {
+        if ($null -eq $candidate -or [string]::IsNullOrWhiteSpace($candidate.Url)) { continue }
+        $videos += [pscustomobject]@{
+            title      = if ($candidate.Title) { [string]$candidate.Title } else { "Video" }
+            url        = [string]$candidate.Url
+            source     = if ($candidate.Source) { [string]$candidate.Source } else { "tecnico" }
+            confidence = 0.8
+            reason     = if ($candidate.DetectionMethod) { [string]$candidate.DetectionMethod } else { "Detectado tecnicamente" }
+        }
+    }
+    return [pscustomobject]@{
+        intent   = "find_videos"
+        summary  = $Summary
+        videos   = @($videos)
+        warnings = @($Warnings)
+    }
+}
+
+function Invoke-YtDlpFlatPlaylist {
+    param([Parameter(Mandatory=$true)][string]$Url)
+    try {
+        $yt = Get-Command yt-dlp -ErrorAction Stop
+        $args = @("--flat-playlist", "--dump-single-json", "--no-warnings", "--ignore-config")
+        $args += Get-JsRuntimeArgs
+        $args += Get-ActiveCookiesArgs
+        $args += @($Url)
+        $res = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Buscando videos" -TimeoutSec 90
+        if ($res.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($res.StdOut)) {
+            Write-AiLog -Level "WARN" -Message ("yt-dlp flat playlist sin resultados para {0}: {1}" -f $Url, $res.StdErr)
+            return @()
+        }
+        $json = $res.StdOut | ConvertFrom-Json
+        $items = @()
+        if ($json.entries) {
+            foreach ($entry in @($json.entries)) {
+                $rawUrl = if ($entry.webpage_url) { $entry.webpage_url } elseif ($entry.url) { $entry.url } else { "" }
+                $videoUrl = Resolve-DetectedVideoUrl -CandidateUrl $rawUrl -OriginalUrl $Url
+                if ([string]::IsNullOrWhiteSpace($videoUrl)) { continue }
+                $items += [pscustomobject]@{
+                    Title = if ($entry.title) { [string]$entry.title } else { "Video" }
+                    Url = $videoUrl
+                    Source = if ($entry.extractor) { [string]$entry.extractor } elseif ($json.extractor) { [string]$json.extractor } else { "yt-dlp" }
+                    DetectionMethod = "yt-dlp-flat-playlist"
+                }
+            }
+        }
+        return @($items | Sort-Object Url -Unique)
+    } catch {
+        Write-AiLog -Level "WARN" -Message ("Error flat playlist {0}: {1}" -f $Url, $_.Exception.Message)
+        return @()
+    }
+}
+
+function Invoke-YtDlpSingleVideoInfo {
+    param([Parameter(Mandatory=$true)][string]$Url)
+    try {
+        $yt = Get-Command yt-dlp -ErrorAction Stop
+        $args = @("--dump-json", "--no-playlist", "--no-warnings", "--ignore-config")
+        $args += Get-JsRuntimeArgs
+        $args += Get-ActiveCookiesArgs
+        $args += @($Url)
+        $res = Invoke-CaptureResponsive -ExePath $yt.Source -Args $args -WorkingText "Validando video" -TimeoutSec 90
+        if ($res.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($res.StdOut)) {
+            Write-AiLog -Level "WARN" -Message ("yt-dlp single sin resultados para {0}: {1}" -f $Url, $res.StdErr)
+            return $null
+        }
+        $json = $res.StdOut | ConvertFrom-Json
+        if (-not $json.title) { return $null }
+        return [pscustomobject]@{
+            Title = [string]$json.title
+            Url = if ($json.webpage_url) { [string]$json.webpage_url } else { $Url }
+            Source = if ($json.extractor) { [string]$json.extractor } else { "yt-dlp" }
+            DetectionMethod = "yt-dlp-single-video"
+        }
+    } catch {
+        Write-AiLog -Level "WARN" -Message ("Error single video {0}: {1}" -f $Url, $_.Exception.Message)
+        return $null
+    }
+}
+
+function Find-VideoLinksInHtml {
+    param([Parameter(Mandatory=$true)][string]$Url)
+    try {
+        $res = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 30
+        $html = $res.Content
+        $baseUri = [Uri]$Url
+        $found = New-Object System.Collections.ArrayList
+        $patterns = @(
+            'https?://[^"''\s<>]+',
+            'href=["'']([^"'']+)["'']',
+            'src=["'']([^"'']+)["'']',
+            'property=["'']og:video["''][^>]+content=["'']([^"'']+)["'']',
+            'name=["'']twitter:player["''][^>]+content=["'']([^"'']+)["'']'
+        )
+        foreach ($pattern in $patterns) {
+            $matches = [regex]::Matches($html, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            foreach ($m in $matches) {
+                $candidateUrl = if ($m.Groups.Count -gt 1 -and $m.Groups[1].Value) { $m.Groups[1].Value } else { $m.Value }
+                if ([string]::IsNullOrWhiteSpace($candidateUrl)) { continue }
+                if ($candidateUrl -match '^//') {
+                    $candidateUrl = "$($baseUri.Scheme):$candidateUrl"
+                } elseif ($candidateUrl -match '^/') {
+                    $candidateUrl = "$($baseUri.Scheme)://$($baseUri.Host)$candidateUrl"
+                } elseif ($candidateUrl -notmatch '^https?://') {
+                    try { $candidateUrl = ([Uri]::new($baseUri, $candidateUrl)).AbsoluteUri } catch {}
+                }
+                if ($candidateUrl -match 'youtube|youtu\.be|vimeo|dailymotion|twitch|tiktok|facebook|instagram|\.mp4(\?|$)|\.m3u8(\?|$)') {
+                    [void]$found.Add([pscustomobject]@{
+                        Title = "Candidato detectado en HTML"
+                        Url = $candidateUrl
+                        Source = "html"
+                        DetectionMethod = "html-regex"
+                    })
+                }
+            }
+        }
+        return @($found | Sort-Object Url -Unique)
+    } catch {
+        Write-AiLog -Level "WARN" -Message ("Error HTML {0}: {1}" -f $Url, $_.Exception.Message)
+        return @()
+    }
+}
+
+function Invoke-AiVideoCandidateClassifier {
+    param(
+        [Parameter(Mandatory=$true)][string]$OriginalUrl,
+        [array]$Candidates
+    )
+
+    $cfg = Get-AiConfig
+    if (-not $cfg.Enabled) { throw "La IA no esta activada." }
+
+    if (-not $Candidates -or @($Candidates).Count -eq 0) {
+        return [pscustomobject]@{
+            intent = "find_videos"
+            summary = "No se encontraron videos descargables."
+            videos = @()
+            warnings = @("No hubo candidatos tecnicos para clasificar.")
+        }
+    }
+
+    $system = @"
+Eres el asistente integrado de YTDLL, una aplicacion de escritorio para Windows que usa yt-dlp.
+Clasifica candidatos de video encontrados por la aplicacion.
+No inventes URLs. No inventes titulos. Solo usa los candidatos proporcionados.
+Devuelve unicamente JSON valido.
+"@
+    $candidateJson = $Candidates | ConvertTo-Json -Depth 6
+    $prompt = @"
+URL original:
+$OriginalUrl
+
+Candidatos tecnicos encontrados:
+$candidateJson
+
+Devuelve JSON con este formato:
+{
+  "intent": "find_videos",
+  "summary": "texto breve",
+  "videos": [
+    {
+      "title": "texto",
+      "url": "url",
+      "source": "texto",
+      "confidence": 0.0,
+      "reason": "texto"
+    }
+  ],
+  "warnings": []
+}
+"@
+    try {
+        $raw = Invoke-GeminiGenerateContent `
+            -Prompt $prompt `
+            -SystemInstruction $system `
+            -Model $cfg.Model `
+            -ApiKey $cfg.ApiKey `
+            -Temperature $cfg.Temperature `
+            -MaxOutputTokens $cfg.MaxOutputTokens `
+            -ResponseMimeType "application/json"
+        $parsed = $raw | ConvertFrom-Json
+        $allowed = @{}
+        foreach ($candidate in @($Candidates)) {
+            if ($candidate.Url) { $allowed[[string]$candidate.Url] = $true }
+        }
+        $safeVideos = @()
+        foreach ($video in @($parsed.videos)) {
+            if ($null -eq $video -or [string]::IsNullOrWhiteSpace($video.url)) { continue }
+            if (-not $allowed.ContainsKey([string]$video.url)) { continue }
+            $safeVideos += $video
+        }
+        return [pscustomobject]@{
+            intent   = if ($parsed.intent) { [string]$parsed.intent } else { "find_videos" }
+            summary  = if ($parsed.summary) { [string]$parsed.summary } else { "Resultados clasificados por IA." }
+            videos   = @($safeVideos)
+            warnings = @($parsed.warnings)
+        }
+    } catch {
+        Write-AiLog -Level "WARN" -Message ("Clasificacion IA fallo para {0}: {1}" -f $OriginalUrl, $_.Exception.Message)
+        return Convert-TechnicalCandidatesToAiResult -Summary "La IA no pudo clasificar la respuesta; se muestran los resultados tecnicos." -Candidates $Candidates -Warnings @("La IA respondio con error o JSON no valido.")
+    }
+}
+
+function Find-VideosFromUrlWithAi {
+    param([Parameter(Mandatory=$true)][string]$Url)
+    $cfg = Get-AiConfig
+    if (-not $cfg.Enabled) { throw "La IA no esta activada." }
+    if (-not $cfg.VideoFinderEnabled) { throw "El buscador de videos con IA esta desactivado." }
+    if ([string]::IsNullOrWhiteSpace($cfg.ApiKey)) { throw "La IA esta activada, pero no se ha configurado una API Key de Gemini." }
+
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $technicalCandidates = @()
+    try {
+        $technicalCandidates += @(Invoke-YtDlpFlatPlaylist -Url $Url)
+        if (@($technicalCandidates).Count -eq 0) {
+            $single = Invoke-YtDlpSingleVideoInfo -Url $Url
+            if ($single) { $technicalCandidates += $single }
+        }
+        if (@($technicalCandidates).Count -eq 0) {
+            $technicalCandidates += @(Find-VideoLinksInHtml -Url $Url)
+        }
+
+        $result = Invoke-AiVideoCandidateClassifier -OriginalUrl $Url -Candidates $technicalCandidates
+        Write-AiLog -Message ("VideoFinder url={0} model={1} candidates={2} accepted={3} elapsedMs={4}" -f $Url, $cfg.Model, @($technicalCandidates).Count, @($result.videos).Count, [int]$sw.ElapsedMilliseconds)
+        return $result
+    } finally {
+        $sw.Stop()
+    }
 }
 
 function Get-ActiveCookiesArgs {
@@ -1202,6 +1676,133 @@ function Get-QueueFormatSelection {
         VideoLabel = if ($cmbVideoFmt -and $cmbVideoFmt.SelectedItem) { [string]$cmbVideoFmt.SelectedItem } else { "" }
         AudioLabel = if ($cmbAudioFmt -and $cmbAudioFmt.SelectedItem) { [string]$cmbAudioFmt.SelectedItem } else { "" }
         SizeText   = if ($size -gt 0) { Human-Size $size } else { "" }
+    }
+}
+
+function Test-QueueContainsUrl {
+    param([Parameter(Mandatory=$true)][string]$Url)
+    if (-not $script:downloadQueue) { return $false }
+    $target = (Normalize-InputUrl -Url $Url).Trim().TrimEnd("/")
+    foreach ($item in @($script:downloadQueue)) {
+        if ($null -eq $item -or [string]::IsNullOrWhiteSpace($item.Url)) { continue }
+        $existing = (Normalize-InputUrl -Url ([string]$item.Url)).Trim().TrimEnd("/")
+        if ($existing -eq $target) { return $true }
+    }
+    return $false
+}
+
+function Add-UrlToDownloadQueue {
+    param(
+        [Parameter(Mandatory=$true)][string]$Url,
+        [string]$Title = "Video",
+        [string]$Source = "manual",
+        [bool]$NoPlaylist = $true
+    )
+
+    $normalizedUrl = Normalize-InputUrl -Url $Url
+    if ([string]::IsNullOrWhiteSpace($normalizedUrl) -or $normalizedUrl -notmatch '^https?://') {
+        return [pscustomobject]@{ Added = $false; Reason = "URL invalida"; Item = $null }
+    }
+    if (Test-QueueContainsUrl -Url $normalizedUrl) {
+        return [pscustomobject]@{ Added = $false; Reason = "Duplicado"; Item = $null }
+    }
+
+    $dest = $script:ultimaRutaDescarga
+    if ([string]::IsNullOrWhiteSpace($dest)) {
+        $dest = [Environment]::GetFolderPath('Desktop')
+        $script:ultimaRutaDescarga = $dest
+        try { if ($txtDestino) { $txtDestino.Text = $dest } } catch {}
+    }
+    if (-not (Test-Path -LiteralPath $dest)) {
+        try { New-Item -ItemType Directory -Path $dest -Force | Out-Null } catch {
+            return [pscustomobject]@{ Added = $false; Reason = "No se pudo preparar destino"; Item = $null }
+        }
+    }
+
+    $fmt = Get-QueueFormatSelection
+    $item = [pscustomobject]@{
+        Id               = [guid]::NewGuid().ToString()
+        Url              = $normalizedUrl
+        Title            = if ([string]::IsNullOrWhiteSpace($Title)) { "Video" } else { $Title }
+        ThumbUrl         = ""
+        Destination      = $dest
+        FormatSelector   = $fmt.Selector
+        MergeExt         = $fmt.MergeExt
+        VideoFormatId    = $fmt.VideoId
+        AudioFormatId    = $fmt.AudioId
+        VideoFormatLabel = $fmt.VideoLabel
+        AudioFormatLabel = $fmt.AudioLabel
+        SizeText         = $fmt.SizeText
+        NoPlaylist       = $NoPlaylist
+        BestProgId       = ""
+        Status           = "Waiting"
+        Phase            = "En espera"
+        DownloadStage    = ""
+        Percent          = 0
+        Speed            = ""
+        Eta              = ""
+        TargetPath       = ""
+        ExitCode         = $null
+        LastError        = ""
+        DebugLogPath     = ""
+        ArgsText         = ""
+        OutputTail       = ""
+        ErrorTail        = ""
+        CreatedAt        = [DateTime]::Now.ToString("o")
+        StartedAt        = ""
+        CompletedAt      = ""
+        StartRequested   = [bool]$script:queueAutoDownload
+        CancelRequested  = $false
+        Process          = $null
+        StdoutPath       = ""
+        StderrPath       = ""
+        StdoutReader     = $null
+        StderrReader     = $null
+        StdoutStream     = $null
+        StderrStream     = $null
+        LastOutFragment  = ""
+        LastErrFragment  = ""
+        Source           = $Source
+    }
+
+    if (-not $script:downloadQueue) { $script:downloadQueue = New-Object System.Collections.ArrayList }
+    $item = Initialize-QueueItemShape -Item $item
+    [void]$script:downloadQueue.Add($item)
+    Add-HistoryUrl -Url $normalizedUrl
+    return [pscustomobject]@{ Added = $true; Reason = ""; Item = $item }
+}
+
+function Add-VideoFinderResultsToQueue {
+    param([array]$Videos)
+    $added = 0
+    $skipped = 0
+    $messages = @()
+
+    foreach ($video in @($Videos)) {
+        if ($null -eq $video) { continue }
+        $url = if ($video.url) { [string]$video.url } elseif ($video.Url) { [string]$video.Url } else { "" }
+        $title = if ($video.title) { [string]$video.title } elseif ($video.Title) { [string]$video.Title } else { "Video" }
+        $source = if ($video.source) { [string]$video.source } elseif ($video.Source) { [string]$video.Source } else { "ai-video-finder" }
+        $res = Add-UrlToDownloadQueue -Url $url -Title $title -Source $source -NoPlaylist $true
+        if ($res.Added) {
+            $added++
+        } else {
+            $skipped++
+            if ($res.Reason) { $messages += ("{0}: {1}" -f $title, $res.Reason) }
+        }
+    }
+
+    if ($added -gt 0) {
+        Save-DownloadQueue
+        Set-QueuePanelExpanded -Expanded $true
+        Refresh-QueuePanel
+        Start-NextQueuedDownloads
+    }
+
+    return [pscustomobject]@{
+        Added = $added
+        Skipped = $skipped
+        Messages = @($messages)
     }
 }
 

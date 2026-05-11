@@ -104,6 +104,20 @@ $ColorSubText     = "#86868B"
                 <Grid>
                     <TextBlock Text="YTDLL" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,15,0">
+                        <Button Name="btnAi" ToolTip="Asistente IA" Width="32" Height="32" Cursor="Hand" BorderThickness="0" Margin="0,0,8,0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Name="aiBorder" Background="{TemplateBinding Background}" CornerRadius="16">
+                                        <TextBlock Text="IA" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="aiBorder" Property="Opacity" Value="0.85"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
                         <Button Name="btnPickCookies" ToolTip="Configurar cookies de YouTube" Width="32" Height="32" Cursor="Hand" BorderThickness="0" Margin="0,0,8,0">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
@@ -320,6 +334,7 @@ $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $formPrincipal = [System.Windows.Markup.XamlReader]::Load($reader)
 
 $TitleBar = $formPrincipal.FindName("TitleBar")
+$btnAi = $formPrincipal.FindName("btnAi")
 $btnPickCookies = $formPrincipal.FindName("btnPickCookies")
 $btnInfo = $formPrincipal.FindName("btnInfo")
 $txtUrl = $formPrincipal.FindName("txtUrl")
@@ -357,6 +372,460 @@ function Set-CookiesActive {
     Set-IniValue -Section "cookies" -Key "Path" -Value $Path
     Set-IniValue -Section "cookies" -Key "Label" -Value $Label
     Write-Host "[COOKIES] cookiesPath establecido y guardado en ini: $Path" -ForegroundColor Green
+}
+
+function Update-AiButtonVisual {
+    if (-not $btnAi) { return }
+    $cfg = Get-AiConfig
+    if ($cfg.Enabled) {
+        $btnAi.Background = "#34C759"
+        $btnAi.Foreground = "White"
+        $btnAi.ToolTip = "Asistente IA activo"
+    } else {
+        $btnAi.Background = "#E5E5EA"
+        $btnAi.Foreground = "#1D1D1F"
+        $btnAi.ToolTip = "Configurar asistente IA"
+    }
+}
+
+function Show-AiSettingsDialog {
+    $cfg = Get-AiConfig
+    $xaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configuracion de IA" Height="470" Width="460"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" Background="#F5F5F7">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderBrush" Value="#D1D1D6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style TargetType="PasswordBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderBrush" Value="#D1D1D6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="6,0"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="92"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#E5E5EA"/>
+            <Setter Property="Foreground" Value="#1D1D1F"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,18">
+            <TextBlock Text="IA con Gemini" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock Text="Activa el asistente para buscar videos dentro de enlaces." Foreground="#6E6E73" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <CheckBox Name="chkEnabled" Grid.Row="0" Grid.ColumnSpan="2" Content="Activar IA" Margin="0,0,0,14"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Proveedor" VerticalAlignment="Center" Margin="0,0,12,10"/>
+            <ComboBox Name="cmbProvider" Grid.Row="1" Grid.Column="1" Margin="0,0,0,10">
+                <ComboBoxItem Content="Gemini"/>
+            </ComboBox>
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Modelo" VerticalAlignment="Center" Margin="0,0,12,10"/>
+            <ComboBox Name="cmbModel" Grid.Row="2" Grid.Column="1" IsEditable="True" Margin="0,0,0,10">
+                <ComboBoxItem Content="gemini-2.5-flash"/>
+                <ComboBoxItem Content="gemini-2.5-flash-lite"/>
+                <ComboBoxItem Content="gemini-flash-latest"/>
+            </ComboBox>
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="API Key" VerticalAlignment="Center" Margin="0,0,12,10"/>
+            <PasswordBox Name="pwdApiKey" Grid.Row="3" Grid.Column="1" Margin="0,0,0,10"/>
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Temperatura" VerticalAlignment="Center" Margin="0,0,12,10"/>
+            <TextBox Name="txtTemperature" Grid.Row="4" Grid.Column="1" Margin="0,0,0,10"/>
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="Max tokens" VerticalAlignment="Center" Margin="0,0,12,10"/>
+            <TextBox Name="txtMaxTokens" Grid.Row="5" Grid.Column="1" Margin="0,0,0,10"/>
+            <CheckBox Name="chkVideoFinder" Grid.Row="6" Grid.ColumnSpan="2" Content="Habilitar buscador de videos" Margin="0,4,0,0"/>
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="0,20,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Name="btnTestAi" Grid.Column="0" Content="Probar conexion" HorizontalAlignment="Left"/>
+            <Button Name="btnCancelAi" Grid.Column="1" Content="Cancelar" Margin="8,0,0,0"/>
+            <Button Name="btnSaveAi" Grid.Column="2" Content="Guardar" Margin="8,0,0,0" Background="#007AFF" Foreground="White"/>
+        </Grid>
+    </Grid>
+</Window>
+"@
+    $reader = New-Object System.Xml.XmlNodeReader ([xml]$xaml)
+    $dlg = [System.Windows.Markup.XamlReader]::Load($reader)
+    $dlg.Owner = $formPrincipal
+
+    $chkEnabled = $dlg.FindName("chkEnabled")
+    $cmbProvider = $dlg.FindName("cmbProvider")
+    $cmbModel = $dlg.FindName("cmbModel")
+    $pwdApiKey = $dlg.FindName("pwdApiKey")
+    $txtTemperature = $dlg.FindName("txtTemperature")
+    $txtMaxTokens = $dlg.FindName("txtMaxTokens")
+    $chkVideoFinder = $dlg.FindName("chkVideoFinder")
+
+    $chkEnabled.IsChecked = [bool]$cfg.Enabled
+    $cmbProvider.Text = $cfg.Provider
+    $cmbModel.Text = $cfg.Model
+    $pwdApiKey.Password = $cfg.ApiKey
+    $txtTemperature.Text = $cfg.Temperature.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+    $txtMaxTokens.Text = [string]$cfg.MaxOutputTokens
+    $chkVideoFinder.IsChecked = [bool]$cfg.VideoFinderEnabled
+
+    $dlg.FindName("btnTestAi").Add_Click({
+        $temp = 0.2
+        $tokens = 128
+        [void][double]::TryParse($txtTemperature.Text, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$temp)
+        [void][int]::TryParse($txtMaxTokens.Text, [ref]$tokens)
+        $result = Test-AiConnection -Model $cmbModel.Text -ApiKey $pwdApiKey.Password -Temperature 0 -MaxOutputTokens 128
+        if ($result.Ok) {
+            [System.Windows.MessageBox]::Show("Conexion correcta con Gemini.", "IA", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+        } else {
+            [System.Windows.MessageBox]::Show($result.Message, "No se pudo conectar", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
+        }
+    })
+    $dlg.FindName("btnCancelAi").Add_Click({ $dlg.Close() })
+    $dlg.FindName("btnSaveAi").Add_Click({
+        $temp = 0.2
+        $tokens = 2048
+        [void][double]::TryParse($txtTemperature.Text, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$temp)
+        [void][int]::TryParse($txtMaxTokens.Text, [ref]$tokens)
+        Save-AiConfig `
+            -Enabled ([bool]$chkEnabled.IsChecked) `
+            -Provider $cmbProvider.Text `
+            -Model $cmbModel.Text `
+            -ApiKey $pwdApiKey.Password `
+            -Temperature $temp `
+            -MaxOutputTokens $tokens `
+            -ChatEnabled ([bool]$chkEnabled.IsChecked) `
+            -VideoFinderEnabled ([bool]$chkVideoFinder.IsChecked)
+        $script:AiEnabled = [bool]$chkEnabled.IsChecked
+        Update-AiButtonVisual
+        $dlg.DialogResult = $true
+        $dlg.Close()
+    })
+
+    $dlg.ShowDialog() | Out-Null
+}
+
+function Add-AiChatMessage {
+    param($Panel, [string]$Author, [string]$Text, [bool]$IsError = $false)
+    if (-not $Panel) { return }
+    $border = New-Object System.Windows.Controls.Border
+    $border.Margin = "0,0,0,8"
+    $border.Padding = "10"
+    $border.CornerRadius = "6"
+    $border.Background = if ($IsError) { "#FFF0F0" } elseif ($Author -eq "Usuario") { "#E8F2FF" } else { "#F2F2F7" }
+    $stack = New-Object System.Windows.Controls.StackPanel
+    $title = New-Object System.Windows.Controls.TextBlock
+    $title.Text = $Author
+    $title.FontWeight = "SemiBold"
+    $title.Margin = "0,0,0,4"
+    $body = New-Object System.Windows.Controls.TextBlock
+    $body.Text = $Text
+    $body.TextWrapping = "Wrap"
+    $body.Foreground = if ($IsError) { "#B00020" } else { "#1D1D1F" }
+    [void]$stack.Children.Add($title)
+    [void]$stack.Children.Add($body)
+    $border.Child = $stack
+    [void]$Panel.Children.Add($border)
+}
+
+function Add-AiVideoResultCard {
+    param($Panel, $Video, $Checks)
+    $card = New-Object System.Windows.Controls.Border
+    $card.Margin = "0,0,0,8"
+    $card.Padding = "10"
+    $card.BorderBrush = "#D1D1D6"
+    $card.BorderThickness = "1"
+    $card.CornerRadius = "6"
+    $card.Background = "White"
+
+    $grid = New-Object System.Windows.Controls.Grid
+    $grid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = "Auto" }))
+    $grid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = "*" }))
+    $grid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = "Auto" }))
+
+    $chk = New-Object System.Windows.Controls.CheckBox
+    $chk.IsChecked = $true
+    $chk.VerticalAlignment = "Top"
+    $chk.Margin = "0,3,10,0"
+    $chk.Tag = $Video
+    [System.Windows.Controls.Grid]::SetColumn($chk, 0)
+
+    $textStack = New-Object System.Windows.Controls.StackPanel
+    $title = New-Object System.Windows.Controls.TextBlock
+    $title.Text = if ($Video.title) { [string]$Video.title } else { "Video" }
+    $title.FontWeight = "SemiBold"
+    $title.TextWrapping = "Wrap"
+    $url = New-Object System.Windows.Controls.TextBlock
+    $url.Text = [string]$Video.url
+    $url.Foreground = "#6E6E73"
+    $url.FontSize = 12
+    $url.TextWrapping = "Wrap"
+    $meta = New-Object System.Windows.Controls.TextBlock
+    $confidence = if ($Video.confidence -ne $null) { "{0:P0}" -f ([double]$Video.confidence) } else { "n/d" }
+    $meta.Text = "Fuente: {0}   Confianza: {1}" -f $Video.source, $confidence
+    $meta.Foreground = "#6E6E73"
+    $meta.FontSize = 12
+    $meta.Margin = "0,4,0,0"
+    [void]$textStack.Children.Add($title)
+    [void]$textStack.Children.Add($url)
+    [void]$textStack.Children.Add($meta)
+    [System.Windows.Controls.Grid]::SetColumn($textStack, 1)
+
+    $btns = New-Object System.Windows.Controls.StackPanel
+    $btns.Orientation = "Horizontal"
+    $btns.Margin = "10,0,0,0"
+    $btnCopy = New-Object System.Windows.Controls.Button
+    $btnCopy.Content = "Copiar"
+    $btnCopy.Height = 28
+    $btnCopy.MinWidth = 64
+    $btnCopy.Margin = "0,0,6,0"
+    $copyUrl = [string]$Video.url
+    $btnCopy.Add_Click({ try { [System.Windows.Clipboard]::SetText($copyUrl) } catch {} }.GetNewClosure())
+    $btnProbe = New-Object System.Windows.Controls.Button
+    $btnProbe.Content = "Probar"
+    $btnProbe.Height = 28
+    $btnProbe.MinWidth = 64
+    $probeUrl = [string]$Video.url
+    $btnProbe.Add_Click({
+        $probe = Invoke-YtDlpSingleVideoInfo -Url $probeUrl
+        if ($probe) {
+            [System.Windows.MessageBox]::Show("yt-dlp pudo leer el video.", "Prueba", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+        } else {
+            [System.Windows.MessageBox]::Show("yt-dlp no pudo validar este enlace.", "Prueba", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
+        }
+    }.GetNewClosure())
+    [void]$btns.Children.Add($btnCopy)
+    [void]$btns.Children.Add($btnProbe)
+    [System.Windows.Controls.Grid]::SetColumn($btns, 2)
+
+    [void]$grid.Children.Add($chk)
+    [void]$grid.Children.Add($textStack)
+    [void]$grid.Children.Add($btns)
+    $card.Child = $grid
+    [void]$Panel.Children.Add($card)
+    [void]$Checks.Add($chk)
+}
+
+function Show-AiChatWindow {
+    $cfg = Get-AiConfig
+    if (-not $cfg.Enabled -or [string]::IsNullOrWhiteSpace($cfg.ApiKey)) {
+        [System.Windows.MessageBox]::Show("Activa la IA y configura una API Key de Gemini.", "IA", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+        Show-AiSettingsDialog
+        $cfg = Get-AiConfig
+        if (-not $cfg.Enabled -or [string]::IsNullOrWhiteSpace($cfg.ApiKey)) { return }
+    }
+
+    $xaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Asistente IA" Height="680" Width="780"
+        WindowStartupLocation="CenterOwner" Background="#F5F5F7">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="92"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#E5E5EA"/>
+            <Setter Property="Foreground" Value="#1D1D1F"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Asistente IA" FontSize="22" FontWeight="SemiBold"/>
+                <TextBlock Name="lblAiStatus" Text="Gemini listo" Foreground="#6E6E73" Margin="0,3,0,0"/>
+            </StackPanel>
+            <Button Name="btnAiSettings" Grid.Column="1" Content="Configurar"/>
+        </Grid>
+        <Border Grid.Row="1" Background="White" BorderBrush="#D1D1D6" BorderThickness="1" CornerRadius="6">
+            <ScrollViewer Name="svMessages" VerticalScrollBarVisibility="Auto" Padding="10">
+                <StackPanel Name="spAiMessages"/>
+            </ScrollViewer>
+        </Border>
+        <Grid Grid.Row="2" Margin="0,12,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox Name="txtAiInput" Grid.Column="0" Height="66" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="8"/>
+            <Button Name="btnAiSend" Grid.Column="1" Content="Enviar" Margin="8,0,0,0" Background="#007AFF" Foreground="White"/>
+            <Button Name="btnAiFindVideos" Grid.Column="2" Content="Buscar videos" Margin="8,0,0,0" Background="#34C759" Foreground="White"/>
+        </Grid>
+        <Border Grid.Row="3" Background="White" BorderBrush="#D1D1D6" BorderThickness="1" CornerRadius="6">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
+                <StackPanel Name="spAiResults"/>
+            </ScrollViewer>
+        </Border>
+        <Grid Grid.Row="4" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Name="lblAiFooter" Text="Pega un enlace o escribe una peticion." Foreground="#6E6E73" VerticalAlignment="Center"/>
+            <Button Name="btnAddAiVideosToQueue" Grid.Column="1" Content="Agregar seleccionados" Background="#007AFF" Foreground="White"/>
+            <Button Name="btnCloseAi" Grid.Column="2" Content="Cerrar" Margin="8,0,0,0"/>
+        </Grid>
+    </Grid>
+</Window>
+"@
+    $reader = New-Object System.Xml.XmlNodeReader ([xml]$xaml)
+    $win = [System.Windows.Markup.XamlReader]::Load($reader)
+    $win.Owner = $formPrincipal
+
+    $spMessages = $win.FindName("spAiMessages")
+    $svMessages = $win.FindName("svMessages")
+    $txtInput = $win.FindName("txtAiInput")
+    $spResults = $win.FindName("spAiResults")
+    $lblStatus = $win.FindName("lblAiStatus")
+    $lblFooter = $win.FindName("lblAiFooter")
+    $btnSend = $win.FindName("btnAiSend")
+    $btnFind = $win.FindName("btnAiFindVideos")
+    $btnAdd = $win.FindName("btnAddAiVideosToQueue")
+    $checks = New-Object System.Collections.ArrayList
+
+    Add-AiChatMessage -Panel $spMessages -Author "IA" -Text "Pega un enlace y usa Buscar videos para detectar opciones descargables."
+
+    $win.FindName("btnAiSettings").Add_Click({ Show-AiSettingsDialog; Update-AiButtonVisual })
+    $win.FindName("btnCloseAi").Add_Click({ $win.Close() })
+
+    $btnSend.Add_Click({
+        $message = $txtInput.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($message)) { return }
+        Add-AiChatMessage -Panel $spMessages -Author "Usuario" -Text $message
+        $txtInput.Clear()
+        $lblStatus.Text = "Consultando Gemini..."
+        $btnSend.IsEnabled = $false
+        try {
+            $currentCfg = Get-AiConfig
+            $reply = Invoke-GeminiGenerateContent `
+                -Prompt $message `
+                -SystemInstruction "Eres el asistente de YTDLL. Responde breve y en espanol." `
+                -Model $currentCfg.Model `
+                -ApiKey $currentCfg.ApiKey `
+                -Temperature $currentCfg.Temperature `
+                -MaxOutputTokens $currentCfg.MaxOutputTokens `
+                -ResponseMimeType "text/plain"
+            Add-AiChatMessage -Panel $spMessages -Author "IA" -Text $reply
+        } catch {
+            Add-AiChatMessage -Panel $spMessages -Author "Error" -Text $_.Exception.Message -IsError $true
+        } finally {
+            $btnSend.IsEnabled = $true
+            $lblStatus.Text = "Gemini listo"
+            try { $svMessages.ScrollToEnd() } catch {}
+        }
+    })
+
+    $btnFind.Add_Click({
+        $message = $txtInput.Text.Trim()
+        $url = Get-FirstUrlFromText -Text $message
+        if ([string]::IsNullOrWhiteSpace($url)) {
+            [System.Windows.MessageBox]::Show("Pega una URL para buscar videos.", "Falta URL", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
+            return
+        }
+        Add-AiChatMessage -Panel $spMessages -Author "Usuario" -Text $message
+        $txtInput.Clear()
+        $spResults.Children.Clear()
+        $checks.Clear()
+        $lblStatus.Text = "Buscando videos..."
+        $lblFooter.Text = "Analizando enlace..."
+        $btnFind.IsEnabled = $false
+        try {
+            $result = Find-VideosFromUrlWithAi -Url $url
+            Add-AiChatMessage -Panel $spMessages -Author "IA" -Text $result.summary
+            foreach ($warning in @($result.warnings)) {
+                if (-not [string]::IsNullOrWhiteSpace($warning)) {
+                    Add-AiChatMessage -Panel $spMessages -Author "Aviso" -Text ([string]$warning)
+                }
+            }
+            foreach ($video in @($result.videos)) {
+                Add-AiVideoResultCard -Panel $spResults -Video $video -Checks $checks
+            }
+            if (@($result.videos).Count -eq 0) {
+                $empty = New-Object System.Windows.Controls.TextBlock
+                $empty.Text = "No se encontraron videos descargables en ese enlace."
+                $empty.Foreground = "#6E6E73"
+                $empty.Margin = "4"
+                [void]$spResults.Children.Add($empty)
+            }
+            $lblFooter.Text = "{0} resultado(s) listo(s)." -f @($result.videos).Count
+        } catch {
+            Add-AiChatMessage -Panel $spMessages -Author "Error" -Text $_.Exception.Message -IsError $true
+            $lblFooter.Text = "No se pudo completar la busqueda."
+        } finally {
+            $btnFind.IsEnabled = $true
+            $lblStatus.Text = "Gemini listo"
+            try { $svMessages.ScrollToEnd() } catch {}
+        }
+    })
+
+    $btnAdd.Add_Click({
+        $selected = @()
+        foreach ($chk in @($checks)) {
+            if ($chk.IsChecked) { $selected += $chk.Tag }
+        }
+        if ($selected.Count -eq 0) {
+            [System.Windows.MessageBox]::Show("Selecciona al menos un video.", "Cola", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+            return
+        }
+        $res = Add-VideoFinderResultsToQueue -Videos $selected
+        $text = "Agregados: {0}`nOmitidos: {1}" -f $res.Added, $res.Skipped
+        if ($res.Messages.Count -gt 0) { $text += "`n`n" + (($res.Messages | Select-Object -First 5) -join "`n") }
+        [System.Windows.MessageBox]::Show($text, "Cola de descargas", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+        $lblFooter.Text = "Cola actualizada."
+    })
+
+    $win.ShowDialog() | Out-Null
 }
 
 # Eventos Base
