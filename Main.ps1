@@ -37,6 +37,18 @@ if (-not (Test-Path -LiteralPath $script:LogFile)) {
 #  VERSIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 $version = "beta 251215.1225"
+$releaseVersionFile = Join-Path $PSScriptRoot "version.json"
+if (Test-Path -LiteralPath $releaseVersionFile) {
+    try {
+        $releaseVersion = Get-Content -LiteralPath $releaseVersionFile -Raw |
+            ConvertFrom-Json
+        if (-not [string]::IsNullOrWhiteSpace($releaseVersion.Version)) {
+            $version = [string]$releaseVersion.Version
+        }
+    } catch {
+        Write-Host "[WARN] No se pudo leer version.json: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ENCODING UTF-8
@@ -149,7 +161,7 @@ if ($mpvnetInstalled) {
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host "`n=============================================" -ForegroundColor DarkCyan
 Write-Host "                   YTDLL                     " -ForegroundColor Green
-Write-Host ("              Versión: v{0}" -f $version)    -ForegroundColor Green
+Write-Host ("              Versión: {0}" -f $version)     -ForegroundColor Green
 Write-Host "=============================================" -ForegroundColor DarkCyan
 
 # ═══════════════════════════════════════════════════════════════════════════════

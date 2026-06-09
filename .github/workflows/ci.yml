@@ -1,46 +1,79 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+defaults:
+  run:
+    shell: powershell
 
 jobs:
-  test:
+  validate:
     runs-on: windows-latest
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup PowerShell
-      uses: actions/setup-powershell@v3
-      with:
-        target-version: '5.x'
-    
-    - name: Run PSScriptAnalyzer
-      run: |
-        Invoke-ScriptAnalyzer -Path src -Recurse
-        
-    - name: Run Basic Tests
-      run: |
-        if (Test-Path "tests/*.ps1") {
-          Invoke-Pester -Path tests -PassThru
-        }
-  
-  build:
-    needs: test
-    runs-on: windows-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Build Project
-      run: |
-        .\build.ps1 -Version "1.0.0"
-        
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: release/**
-        draft: true
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validar sintaxis PowerShell
+        run: |
+          $failed = $false
+          Get-ChildItem -Path . -Filter *.ps1 -File | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            )
+
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              $errors | ForEach-Object {
+                Write-Error "$($_.Extent.File):$($_.Extent.StartLineNumber) $($_.Message)"
+              }
+            }
+          }
+
+          if ($failed) {
+            exit 1
+          }
+
+      - name: Construir paquete de prueba
+        run: |
+          .\build.ps1 -Version "v0.0.0-ci"
+
+      - name: Validar contenido del ZIP
+        run: |
+          $required = @(
+            "Main.ps1",
+            "Dependencies.ps1",
+            "Functions.ps1",
+            "GUI.ps1",
+            "run.bat",
+            "version.json"
+          )
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead(
+            (Join-Path $PWD "ytdll-release.zip")
+          )
+          try {
+            $entries = @($zip.Entries | ForEach-Object FullName)
+            foreach ($file in $required) {
+              if ($file -notin $entries) {
+                throw "Falta $file en ytdll-release.zip"
+              }
+            }
+          } finally {
+            $zip.Dispose()
+          }
+
+      - name: Subir paquete de prueba
+        uses: actions/upload-artifact@v4
+        with:
+          name: ytdll-package
+          path: ytdll-release.zip

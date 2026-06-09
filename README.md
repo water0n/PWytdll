@@ -76,10 +76,27 @@ YTDLL is a modern GUI built in PowerShell. It provides a clean and intuitive int
 
 ## 🚀 Instalación / Installation
 
-### ⭐ Método Rápido (Recomendado)
-Ejecuta en PowerShell (Admin):
+### ⭐ Método por releases (Recomendado)
 
+1. Descarga `YTDLL.bat` desde el repositorio.
+2. Ejecuta el archivo. Windows solicitará permisos de administrador.
+3. El instalador consulta el último GitHub Release, descarga
+   `ytdll-release.zip`, lo instala en `C:\Temp\YTDLL\app` e inicia la
+   aplicación.
+
+En las siguientes ejecuciones, el mismo BAT comprueba si existe una versión
+nueva antes de abrir YTDLL.
+
+### Método PowerShell anterior
+
+La versión monolítica de la rama `main` todavía puede iniciarse con:
+
+```powershell
 irm bit.ly/ytdll | iex
+```
+
+El método por releases es necesario para la versión modular formada por
+`Main.ps1`, `Dependencies.ps1`, `Functions.ps1` y `GUI.ps1`.
 
 🎮 Uso / Usage
 Interfaz Gráfica
@@ -117,11 +134,14 @@ YTDLL permite activar un asistente IA usando Gemini Flash para ayudar a buscar v
 
 ## 📁 Estructura del Proyecto / Project Structure
 PWytdll/
-├── ytdll.ps1                 # Main script
-├── README.md                 # Documentation
-└── assets/
-    ├── screenshots/          # Screenshots
-    └── icons/                # Icons used by the app
+├── Main.ps1                  # Punto de entrada
+├── Dependencies.ps1          # Dependencias externas
+├── Functions.ps1             # Lógica de la aplicación
+├── GUI.ps1                   # Interfaz
+├── Install-YTDLL.ps1         # Instalador y actualizador
+├── YTDLL.bat                 # Entrada para usuarios
+├── build.ps1                 # Generador del release
+└── README.md
 
 Archivos de configuración
 C:\Temp\ytdll\config.ini
@@ -161,11 +181,25 @@ Dailymotion
 Este proyecto está bajo licencia MIT.
 Consulta el archivo LICENSE.
 
+## Publicar una versión
+
+Primero integra los cambios en `main`. Después crea y publica un tag:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions construirá `ytdll-release.zip` y lo adjuntará al nuevo release.
+Para validar el paquete localmente:
+
+```powershell
+.\build.ps1 -Version v1.0.0
+```
+
 <div align="center">
 
 ⭐ ¿Te gusta este proyecto? Considera dejar una estrella en GitHub.
 ⬆ Volver al inicio
 
-</div> ```
-Set-ExecutionPolicy Bypass -Scope Process -Force
-irm bit.ly/ytdll | iex
+</div>

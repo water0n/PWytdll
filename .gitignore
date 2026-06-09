@@ -15,7 +15,7 @@ Thumbs.db
 release/
 *.zip
 *.log
-dztools-release.zip
+ytdll-release.zip
 estructura.txt
 Pruebas_01.ps1
 tools.ps1
@@ -23,10 +23,10 @@ _github_token.ps1
 _limpiadorderelease.ps1
 
 # Temporal
-C:\Temp\ytdll\
-C:\Temp\icos\
+[Cc]:/Temp/ytdll/
+[Cc]:/Temp/icos/
 __pycache__/
 *.pyc
 
 # Chocolatey
-C:\Choco\
+[Cc]:/Choco/
