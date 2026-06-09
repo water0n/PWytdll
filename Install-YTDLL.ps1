@@ -14,8 +14,14 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+$installRootPath = [System.IO.Path]::GetFullPath($InstallRoot)
+$installRootDrive = [System.IO.Path]::GetPathRoot($installRootPath)
+if ($installRootPath.TrimEnd("\") -eq $installRootDrive.TrimEnd("\")) {
+    throw "InstallRoot no puede ser la raiz de una unidad."
+}
+
 $assetName = "ytdll-release.zip"
-$appPath = Join-Path $InstallRoot "app"
+$appPath = Join-Path $installRootPath "app"
 $localVersionFile = Join-Path $appPath "version.json"
 $localRunBat = Join-Path $appPath "run.bat"
 
@@ -56,10 +62,11 @@ function Use-InstalledCopy {
     return $false
 }
 
-New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $installRootPath -Force | Out-Null
 
-$downloadPath = Join-Path $InstallRoot $assetName
+$downloadPath = Join-Path $installRootPath $assetName
 $remoteVersion = $PackageVersion
+$expectedDigest = $null
 
 if ([string]::IsNullOrWhiteSpace($PackagePath)) {
     $apiUrl = "https://api.github.com/repos/$Owner/$Repository/releases/latest"
@@ -83,6 +90,7 @@ if ([string]::IsNullOrWhiteSpace($PackagePath)) {
         }
         throw "El release $remoteVersion no contiene el archivo $assetName."
     }
+    $expectedDigest = [string]$asset[0].digest
 
     $installedVersion = Get-InstalledVersion
     if (-not $ForceUpdate -and
@@ -98,10 +106,19 @@ if ([string]::IsNullOrWhiteSpace($PackagePath)) {
         Invoke-WebRequest -Uri $asset[0].browser_download_url `
             -OutFile $downloadPath -UseBasicParsing
     } catch {
+        Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
         if (Use-InstalledCopy -Reason "No se pudo descargar $remoteVersion`: $($_.Exception.Message)") {
             return
         }
         throw
+    }
+
+    if ($expectedDigest -match '^sha256:([a-fA-F0-9]{64})$') {
+        $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash
+        if ($actualHash -ne $matches[1]) {
+            Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+            throw "La suma SHA256 del paquete descargado no coincide con GitHub."
+        }
     }
 } else {
     $resolvedPackage = (Resolve-Path -LiteralPath $PackagePath).Path
@@ -111,8 +128,8 @@ if ([string]::IsNullOrWhiteSpace($PackagePath)) {
     }
 }
 
-$stagingPath = Join-Path $InstallRoot ("app.new." + [guid]::NewGuid().ToString("N"))
-$backupPath = Join-Path $InstallRoot ("app.old." + [guid]::NewGuid().ToString("N"))
+$stagingPath = Join-Path $installRootPath ("app.new." + [guid]::NewGuid().ToString("N"))
+$backupPath = Join-Path $installRootPath ("app.old." + [guid]::NewGuid().ToString("N"))
 
 try {
     New-Item -ItemType Directory -Path $stagingPath -Force | Out-Null
@@ -132,6 +149,18 @@ try {
         }
     }
 
+    $packageInfo = Get-Content -LiteralPath (Join-Path $stagingPath "version.json") -Raw |
+        ConvertFrom-Json
+    $packageVersionFound = [string]$packageInfo.Version
+    if ([string]::IsNullOrWhiteSpace($packageVersionFound)) {
+        throw "version.json no contiene una version valida."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($remoteVersion) -and
+        $remoteVersion -ne "paquete local" -and
+        $packageVersionFound -ne $remoteVersion) {
+        throw "La version del paquete ($packageVersionFound) no coincide con el release ($remoteVersion)."
+    }
+
     if (Test-Path -LiteralPath $appPath) {
         Move-Item -LiteralPath $appPath -Destination $backupPath
     }
@@ -146,7 +175,7 @@ try {
     }
 
     if (Test-Path -LiteralPath $backupPath) {
-        Remove-Item -LiteralPath $backupPath -Recurse -Force
+        Remove-Item -LiteralPath $backupPath -Recurse -Force -ErrorAction SilentlyContinue
     }
 } finally {
     if (Test-Path -LiteralPath $stagingPath) {

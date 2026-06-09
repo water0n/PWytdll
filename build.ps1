@@ -2,10 +2,28 @@
 [CmdletBinding()]
 param(
     [string]$Version = ("v{0}" -f (Get-Date -Format "yyMMdd.HHmm")),
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot "release")
+    [string]$OutputDirectory
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
+    $OutputDirectory = Join-Path $PSScriptRoot "release"
+}
+
+$projectRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
+$outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
+$projectPrefix = $projectRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+) + [System.IO.Path]::DirectorySeparatorChar
+
+if (-not $outputRoot.StartsWith(
+        $projectPrefix,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw "OutputDirectory debe estar dentro del proyecto: $projectRoot"
+}
 
 $requiredFiles = @(
     "Main.ps1",
@@ -19,11 +37,19 @@ foreach ($file in $requiredFiles) {
     if (-not (Test-Path -LiteralPath $sourcePath)) {
         throw "Falta el archivo requerido: $sourcePath"
     }
+}
 
+$scriptsToValidate = @(
+    $requiredFiles
+    "Install-YTDLL.ps1"
+    "build.ps1"
+)
+foreach ($scriptName in $scriptsToValidate) {
+    $sourceFile = Get-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName)
     $tokens = $null
     $parseErrors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile(
-        $sourcePath,
+        $sourceFile.FullName,
         [ref]$tokens,
         [ref]$parseErrors
     )
@@ -35,14 +61,14 @@ foreach ($file in $requiredFiles) {
     }
 }
 
-if (Test-Path -LiteralPath $OutputDirectory) {
-    Remove-Item -LiteralPath $OutputDirectory -Recurse -Force
+if (Test-Path -LiteralPath $outputRoot) {
+    Remove-Item -LiteralPath $outputRoot -Recurse -Force
 }
-New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 
 foreach ($file in $requiredFiles) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) `
-        -Destination (Join-Path $OutputDirectory $file) -Force
+        -Destination (Join-Path $outputRoot $file) -Force
 }
 
 $versionInfo = [ordered]@{
@@ -51,7 +77,7 @@ $versionInfo = [ordered]@{
 }
 $versionInfo |
     ConvertTo-Json |
-    Set-Content -LiteralPath (Join-Path $OutputDirectory "version.json") -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $outputRoot "version.json") -Encoding UTF8
 
 $runBat = @'
 @echo off
@@ -70,7 +96,7 @@ if not "%exitCode%"=="0" (
 exit /b %exitCode%
 '@
 [System.IO.File]::WriteAllText(
-    (Join-Path $OutputDirectory "run.bat"),
+    (Join-Path $outputRoot "run.bat"),
     $runBat,
     [System.Text.Encoding]::ASCII
 )
@@ -80,7 +106,7 @@ if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
 
-Compress-Archive -Path (Join-Path $OutputDirectory "*") `
+Compress-Archive -Path (Join-Path $outputRoot "*") `
     -DestinationPath $zipPath -CompressionLevel Optimal -Force
 
 Write-Host "Release creado: $zipPath" -ForegroundColor Green

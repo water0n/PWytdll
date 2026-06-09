@@ -78,7 +78,8 @@ YTDLL is a modern GUI built in PowerShell. It provides a clean and intuitive int
 
 ### ⭐ Método por releases (Recomendado)
 
-1. Descarga `YTDLL.bat` desde el repositorio.
+1. [Descarga `YTDLL.bat`](https://github.com/water0n/PWytdll/releases/latest/download/YTDLL.bat)
+   desde la sección de releases.
 2. Ejecuta el archivo. Windows solicitará permisos de administrador.
 3. El instalador consulta el último GitHub Release, descarga
    `ytdll-release.zip`, lo instala en `C:\Temp\YTDLL\app` e inicia la

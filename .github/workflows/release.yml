@@ -30,5 +30,7 @@ jobs:
         run: |
           gh release create $env:GITHUB_REF_NAME `
             "ytdll-release.zip#YTDLL $env:GITHUB_REF_NAME" `
+            "YTDLL.bat#Instalador de YTDLL" `
+            "Install-YTDLL.ps1#Bootstrap de YTDLL" `
             --title "YTDLL $env:GITHUB_REF_NAME" `
             --generate-notes

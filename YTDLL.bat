@@ -2,7 +2,10 @@
 setlocal
 title Instalador de YTDLL
 
-net session >nul 2>&1
+powershell.exe -NoProfile -Command ^
+  "$principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent());" ^
+  "if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { exit 0 } else { exit 1 }"
+
 if not "%errorlevel%"=="0" (
     echo Solicitando permisos de administrador...
     powershell.exe -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
@@ -10,7 +13,7 @@ if not "%errorlevel%"=="0" (
 )
 
 set "bootstrap=%TEMP%\Install-YTDLL.ps1"
-set "bootstrapUrl=https://raw.githubusercontent.com/water0n/PWytdll/refs/heads/main/Install-YTDLL.ps1"
+set "bootstrapUrl=https://github.com/water0n/PWytdll/releases/latest/download/Install-YTDLL.ps1"
 
 echo Descargando el instalador de YTDLL...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^

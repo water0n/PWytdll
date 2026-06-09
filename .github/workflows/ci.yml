@@ -21,11 +21,21 @@ jobs:
       - name: Validar sintaxis PowerShell
         run: |
           $failed = $false
-          Get-ChildItem -Path . -Filter *.ps1 -File | ForEach-Object {
+          $scripts = @(
+            "Main.ps1",
+            "Dependencies.ps1",
+            "Functions.ps1",
+            "GUI.ps1",
+            "Install-YTDLL.ps1",
+            "build.ps1"
+          )
+
+          $scripts | ForEach-Object {
+            $file = Get-Item -LiteralPath $_
             $tokens = $null
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
-              $_.FullName,
+              $file.FullName,
               [ref]$tokens,
               [ref]$errors
             )
