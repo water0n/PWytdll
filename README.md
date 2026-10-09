@@ -177,6 +177,10 @@ YTDLL permite activar un asistente IA usando Gemini Flash para ayudar a buscar v
 - El motor tecnico de deteccion sigue siendo yt-dlp.
 - Gemini clasifica y resume candidatos, pero no descarga contenido directamente.
 - Los resultados siempre se muestran para seleccionarlos antes de agregarlos a la cola.
+- En Configuración de IA, `auto` consulta `models.list` con tu clave, elige los tres Gemini Flash estables más recientes que admiten `generateContent` y los prueba en ese orden. Excluye 3.7 Flash porque Google lo redirige a 3.8. La lista se actualiza cada hora durante la sesión.
+- Si el catálogo no responde, usa `gemini-3.8-flash`, luego `gemini-3.6-flash` y `gemini-3.5-flash`. Ante 404, 408, 429, errores 5xx, timeout, respuesta sin texto o JSON inválido cuando se espera JSON, prueba el siguiente modelo. Los errores de clave o solicitud detienen la llamada. Un modelo escrito manualmente usa sólo ese modelo.
+- Las instalaciones que conservan el antiguo valor inicial `gemini-2.5-flash` pasan a `auto` al cargar la configuración. Para fijar una versión, selecciónala en Configuración de IA.
+- El modelo que respondió y los fallos de cada intento se registran en `C:\Temp\ytdll\logs\ai.log`. La selección automática prioriza la versión Flash estable más reciente; no mide calidad, costo ni latencia de cada modelo.
 
 ## 📁 Estructura del Proyecto / Project Structure
 PWytdll/

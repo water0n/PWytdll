@@ -621,9 +621,10 @@ function Show-AiSettingsDialog {
             </ComboBox>
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Modelo" VerticalAlignment="Center" Margin="0,0,12,10"/>
             <ComboBox Name="cmbModel" Grid.Row="2" Grid.Column="1" IsEditable="True" Margin="0,0,0,10">
-                <ComboBoxItem Content="gemini-2.5-flash"/>
-                <ComboBoxItem Content="gemini-2.5-flash-lite"/>
-                <ComboBoxItem Content="gemini-flash-latest"/>
+                <ComboBoxItem Content="auto"/>
+                <ComboBoxItem Content="gemini-3.8-flash"/>
+                <ComboBoxItem Content="gemini-3.6-flash"/>
+                <ComboBoxItem Content="gemini-3.5-flash"/>
             </ComboBox>
             <TextBlock Grid.Row="3" Grid.Column="0" Text="API Key" VerticalAlignment="Center" Margin="0,0,12,10"/>
             <PasswordBox Name="pwdApiKey" Grid.Row="3" Grid.Column="1" Margin="0,0,0,10"/>
@@ -669,11 +670,7 @@ function Show-AiSettingsDialog {
     $chkVideoFinder.IsChecked = [bool]$cfg.VideoFinderEnabled
 
     $dlg.FindName("btnTestAi").Add_Click({
-        $temp = 0.2
-        $tokens = 128
-        [void][double]::TryParse($txtTemperature.Text, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$temp)
-        [void][int]::TryParse($txtMaxTokens.Text, [ref]$tokens)
-        $result = Test-AiConnection -Model $cmbModel.Text -ApiKey $pwdApiKey.Password -Temperature 0 -MaxOutputTokens 128
+        $result = Test-AiConnection -Model $cmbModel.Text -ApiKey $pwdApiKey.Password -Temperature 0 -MaxOutputTokens 512
         if ($result.Ok) {
             [System.Windows.MessageBox]::Show("Conexion correcta con Gemini.", "IA", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
         } else {

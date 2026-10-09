@@ -137,10 +137,14 @@ function Get-AiConfig {
     [void][double]::TryParse($temperatureRaw, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$temperature)
     [void][int]::TryParse($tokensRaw, [ref]$maxOutputTokens)
 
+    $model = Get-IniValue -Section "ai" -Key "Model" -DefaultValue "auto"
+    # 2.5 Flash era el valor inicial de YTDLL; actualizar instalaciones existentes.
+    if ([string]::IsNullOrWhiteSpace($model) -or $model -eq "gemini-2.5-flash") { $model = "auto" }
+
     return [pscustomobject]@{
         Enabled            = $enabled
         Provider           = Get-IniValue -Section "ai" -Key "Provider" -DefaultValue "Gemini"
-        Model              = Get-IniValue -Section "ai" -Key "Model" -DefaultValue "gemini-2.5-flash"
+        Model              = $model
         ApiKey             = $plainKey
         Temperature        = $temperature
         MaxOutputTokens    = $maxOutputTokens
@@ -155,7 +159,7 @@ function Save-AiConfig {
     param(
         [bool]$Enabled,
         [string]$Provider = "Gemini",
-        [string]$Model = "gemini-2.5-flash",
+        [string]$Model = "auto",
         [string]$ApiKey = "",
         [double]$Temperature = 0.2,
         [int]$MaxOutputTokens = 2048,
@@ -165,7 +169,7 @@ function Save-AiConfig {
     )
 
     if ([string]::IsNullOrWhiteSpace($Provider)) { $Provider = "Gemini" }
-    if ([string]::IsNullOrWhiteSpace($Model)) { $Model = "gemini-2.5-flash" }
+    if ([string]::IsNullOrWhiteSpace($Model)) { $Model = "auto" }
     if ($MaxOutputTokens -lt 128) { $MaxOutputTokens = 128 }
 
     Set-IniValue -Section "ai" -Key "Enabled" -Value ([string]$Enabled).ToLower()
@@ -199,11 +203,74 @@ function Write-AiLog {
     }
 }
 
+function Get-GeminiAutoModels {
+    param([Parameter(Mandatory=$true)][string]$ApiKey)
+
+    $fallback = @("gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash")
+    if ($script:GeminiModelCache -and
+        $script:GeminiModelCache.ApiKey -eq $ApiKey -and
+        (Get-Date) -lt $script:GeminiModelCache.ExpiresAt) {
+        return @($script:GeminiModelCache.Models)
+    }
+
+    try {
+        $found = @()
+        $pageToken = ""
+        $seenTokens = @{}
+        for ($page = 0; $page -lt 20; $page++) {
+            $uri = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
+            if ($pageToken) { $uri += "&pageToken=$([Uri]::EscapeDataString($pageToken))" }
+            $response = Invoke-RestMethod -Method Get -Uri $uri -Headers @{ "x-goog-api-key" = $ApiKey } -TimeoutSec 30 -ErrorAction Stop
+            foreach ($item in @($response.models)) {
+                if ($null -eq $item -or "generateContent" -notin @($item.supportedGenerationMethods)) { continue }
+                if ([string]$item.name -notmatch '^models/(gemini-(\d+)(?:\.(\d+))?-flash)$') { continue }
+                $major = [int]$matches[2]
+                $minor = if ($matches[3]) { [int]$matches[3] } else { 0 }
+                if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 5) -or ($major -eq 3 -and $minor -eq 7)) { continue }
+                $found += [pscustomobject]@{ Id = $matches[1]; Major = $major; Minor = $minor }
+            }
+            $pageToken = [string]$response.nextPageToken
+            if (-not $pageToken) { break }
+            if ($seenTokens.ContainsKey($pageToken)) { throw "El catálogo repitió una página." }
+            $seenTokens[$pageToken] = $true
+            if ($page -eq 19) { throw "El catálogo superó el límite de páginas." }
+        }
+        $models = @($found | Sort-Object -Property @{Expression='Major';Descending=$true},@{Expression='Minor';Descending=$true} | Select-Object -ExpandProperty Id -Unique | Select-Object -First 3)
+        if ($models.Count -eq 0) { throw "El catálogo no contiene modelos Flash compatibles." }
+    } catch {
+        Write-AiLog -Level "WARN" -Message "No se pudo consultar el catálogo de Gemini; se usará el respaldo fijo."
+        $models = $fallback
+    }
+
+    $script:GeminiModelCache = [pscustomobject]@{
+        ApiKey = $ApiKey
+        Models = @($models)
+        ExpiresAt = (Get-Date).AddHours(1)
+    }
+    return @($models)
+}
+
+function Get-GeminiHttpStatus {
+    param($ErrorRecord)
+    try { return [int]$ErrorRecord.Exception.Response.StatusCode } catch { return 0 }
+}
+
+function Test-GeminiRecoverableError {
+    param($ErrorRecord)
+    $status = Get-GeminiHttpStatus -ErrorRecord $ErrorRecord
+    if ($status -in @(404, 408, 429) -or $status -ge 500) { return $true }
+    if ($status -gt 0) { return $false }
+    if ($ErrorRecord.Exception -is [System.Net.WebException]) {
+        return ($ErrorRecord.Exception.Status -in @([System.Net.WebExceptionStatus]::Timeout, [System.Net.WebExceptionStatus]::ConnectFailure, [System.Net.WebExceptionStatus]::ConnectionClosed))
+    }
+    return ($ErrorRecord.Exception -is [System.TimeoutException] -or $ErrorRecord.Exception -is [System.Threading.Tasks.TaskCanceledException])
+}
+
 function Invoke-GeminiGenerateContent {
     param(
         [Parameter(Mandatory=$true)][string]$Prompt,
         [string]$SystemInstruction = "",
-        [string]$Model = "gemini-2.5-flash",
+        [string]$Model = "auto",
         [Parameter(Mandatory=$true)][string]$ApiKey,
         [double]$Temperature = 0.2,
         [int]$MaxOutputTokens = 2048,
@@ -213,10 +280,13 @@ function Invoke-GeminiGenerateContent {
     if ([string]::IsNullOrWhiteSpace($ApiKey)) {
         throw "No se ha configurado la API Key de Gemini."
     }
-    if ([string]::IsNullOrWhiteSpace($Model)) { $Model = "gemini-2.5-flash" }
+    if ([string]::IsNullOrWhiteSpace($Model)) { $Model = "auto" }
     if ($MaxOutputTokens -lt 128) { $MaxOutputTokens = 128 }
 
-    $uri = "https://generativelanguage.googleapis.com/v1beta/models/$Model`:generateContent"
+    if ($Model -ne "auto" -and $Model -notmatch '^gemini-[a-z0-9.-]+$') {
+        throw "Nombre de modelo Gemini no válido."
+    }
+    $models = if ($Model -eq "auto") { @(Get-GeminiAutoModels -ApiKey $ApiKey) } else { @($Model) }
     $generationConfig = @{
         temperature = $Temperature
         maxOutputTokens = $MaxOutputTokens
@@ -240,30 +310,43 @@ function Invoke-GeminiGenerateContent {
         }
     }
 
-    $body = $bodyObject | ConvertTo-Json -Depth 12
     $headers = @{
         "x-goog-api-key" = $ApiKey
         "Content-Type"   = "application/json"
     }
 
-    try {
-        $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body -TimeoutSec 60
-        $text = $response.candidates[0].content.parts[0].text
-        if ([string]::IsNullOrWhiteSpace($text)) { throw "Gemini no devolvio texto." }
-        return $text
-    } catch {
-        $message = $_.Exception.Message
+    foreach ($candidate in $models) {
+        $uri = "https://generativelanguage.googleapis.com/v1beta/models/$candidate`:generateContent"
+        if ($candidate -eq "gemini-3.8-flash") {
+            $generationConfig.thinkingConfig = @{ thinkingLevel = "low" }
+        } else {
+            [void]$generationConfig.Remove("thinkingConfig")
+        }
+        $body = $bodyObject | ConvertTo-Json -Depth 12
         try {
-            $stream = $_.Exception.Response.GetResponseStream()
-            if ($stream) {
-                $reader = New-Object System.IO.StreamReader($stream)
-                $apiError = $reader.ReadToEnd()
-                if (-not [string]::IsNullOrWhiteSpace($apiError)) { $message = $apiError }
+            $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body -TimeoutSec 60 -ErrorAction Stop
+            $text = (@($response.candidates[0].content.parts | ForEach-Object { $_.text }) -join "").Trim()
+            if ([string]::IsNullOrWhiteSpace($text)) {
+                Write-AiLog -Level "WARN" -Message ("Gemini {0} no devolvió texto; se probará el siguiente modelo." -f $candidate)
+                continue
             }
-        } catch {}
-        Write-AiLog -Level "ERROR" -Message ("Gemini generateContent fallo con modelo {0}: {1}" -f $Model, $message)
-        throw "Error llamando a Gemini: $message"
+            if ($ResponseMimeType -eq "application/json") {
+                try { $null = $text | ConvertFrom-Json -ErrorAction Stop }
+                catch {
+                    Write-AiLog -Level "WARN" -Message ("Gemini {0} devolvió JSON no válido; se probará el siguiente modelo." -f $candidate)
+                    continue
+                }
+            }
+            Write-AiLog -Message ("Gemini respondió con modelo {0}." -f $candidate)
+            return $text
+        } catch {
+            $status = Get-GeminiHttpStatus -ErrorRecord $_
+            $recoverable = Test-GeminiRecoverableError -ErrorRecord $_
+            Write-AiLog -Level "WARN" -Message ("Gemini {0} falló (HTTP {1}): {2}" -f $candidate, $status, $_.Exception.Message)
+            if (-not $recoverable) { throw "Error llamando a Gemini ($candidate): $($_.Exception.Message)" }
+        }
     }
+    throw "Ningún modelo Gemini disponible devolvió una respuesta. Revisa el registro de IA o inténtalo más tarde."
 }
 
 function Test-AiConnection {
@@ -271,7 +354,7 @@ function Test-AiConnection {
         [string]$Model = $null,
         [string]$ApiKey = $null,
         [double]$Temperature = 0,
-        [int]$MaxOutputTokens = 128
+        [int]$MaxOutputTokens = 512
     )
     $cfg = Get-AiConfig
     if ([string]::IsNullOrWhiteSpace($Model)) { $Model = $cfg.Model }

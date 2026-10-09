@@ -1,5 +1,7 @@
 # Plan detallado de implementación: Configuración de IA + Buscador de videos con Gemini Flash en YTDLL
 
+> Documento histórico de implementación. La configuración actual usa `Model=auto`, consulta `models.list` y mantiene una cadena de respaldo. Consultar `README.md`, `Functions.ps1` y `C:\Users\water\Documents\githubProyects\APIsGemini.md` para la política vigente; los ejemplos de `gemini-2.5-flash` de este plan ya no son el valor inicial de la aplicación.
+
 ## 1. Objetivo general
 
 Agregar a YTDLL una sección de configuración para activar IA, seleccionar proveedor/modelo y capturar la API Key. Cuando el usuario active la IA, la aplicación habilitará un chat integrado. La primera funcionalidad del chat será un **buscador de videos por enlace**: el usuario pega una URL y la IA ayuda a detectar videos disponibles dentro de ese enlace para agregarlos a la cola de descargas existente.
